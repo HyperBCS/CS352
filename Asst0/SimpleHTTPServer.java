@@ -9,11 +9,11 @@ import java.nio.file.Path;
 
 public class SimpleHTTPServer {
 
-	ServerSocket serverSocket;
-	int port;
+	ServerSocket serverSocket; //the main socket for the server
+	int port; //which port it exists on gotten from command line
 
 	/**
-	 * Constructor
+	 * Constructor to start the server and creates a new thread for each connection
 	 */
 	SimpleHTTPServer(String[] args) {
 
@@ -26,26 +26,23 @@ public class SimpleHTTPServer {
 			e.printStackTrace();
 			return;
 		}
-		System.out.println("HTTP server listening on port "+port);
+		System.out.println("HTTP server listening on port " + port);
 		Socket client = null;
 		while (true) {
-			try {
-				// Accept the client
+			try { // Accept the client
 				client = serverSocket.accept();
 				client.setSoTimeout(3000); //set timeout to 3000
 				HTTPThread clientThread = new HTTPThread(client);
 				Thread t = new Thread(clientThread);
 				t.start();
-			} catch (Exception e) {
-				// When we catch the error, print it out
+			} catch (Exception e) { // When we catch the error, print it out
 				e.printStackTrace();
 			}
 		}
-		client.close();
 	}
 
 	/*
-	 * Main method to instantiate server
+	 * Instantiates the server class by passing in input array
 	 */
 	public static void main(String[] args) {
 		// Check that our arguments are correct. If not we print message and exit.
@@ -69,7 +66,7 @@ public class SimpleHTTPServer {
 		}
 
 		/**
-		 * Log exactly when the request was made
+		 * Log exactly when the request was made with date and time
 		 */
 		private String logBuilder(int status) {
 			StringBuilder pre = new StringBuilder();
@@ -81,7 +78,6 @@ public class SimpleHTTPServer {
 			pre.append(addr + ":" + port + " - ");
 			pre.append(reqStr + " - ");
 			pre.append(status);
-			clientSocket.close();
 			return pre.toString();
 		}
 
@@ -119,10 +115,11 @@ public class SimpleHTTPServer {
 
 		/**
 		 * @param request- a ReqObj containing method and path filled in by parseReq
+		 * this method will perform the requested method, though only GET works.
 		 */
 		public void doMethod(ReqObj request) {
-			String method = request.getMethod();
-			String fullPath = request.getResource();
+			String method = request.getMethod(); //store method
+			String fullPath = request.getResource(); //store the resource path
 			String notImpl = "Not Implemented";
 			switch (method) {
 			case "GET":
@@ -153,7 +150,8 @@ public class SimpleHTTPServer {
 		}
 
 		/**
-		*This method will perform get a resource defined in the ReqObj. Then it will call return response with the correct status and content.
+		* @param req- the GET request
+		* This method will perform get a resource defined in the ReqObj. Then it will call return response with the correct status and content.
 		* If there is an error in fetching the resource give null content, and the correct code.
 		**/
 		private void doGet(ReqObj req) {
@@ -181,10 +179,11 @@ public class SimpleHTTPServer {
 		}
 
 		/**
-		*This method will take a status, and content to be returned to the user.
+		* @param status- the status code to be returned
+		* @param content- a byte array containing the contents of what needs to get to client
+		* Print request and other info pertianing to the Client
 		**/
 		private void returnResponse(int status, byte[] content) {
-			// Prints the request along with other info about client
 			System.out.println(logBuilder(status));
 			try(PrintStream pstream = new PrintStream(clientSocket.getOutputStream())) {
 				HTTPCodes codes = new HTTPCodes();
@@ -194,13 +193,12 @@ public class SimpleHTTPServer {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			clientSocket.close();
 		}
 
 
 		@Override
 		/**
-		 * this method dictates what happens on each thread
+		 * perform the client request if appropriate and within the alloted time of 3s
 		 */
 		public void run() {
 			try(
@@ -223,7 +221,6 @@ public class SimpleHTTPServer {
 					returnResponse(400, "Bad Request".getBytes());
 				}
 				Thread.sleep(250);
-				client.close();
 			} catch (Exception e) {
 				returnResponse(500, "Internal Server Error".getBytes());
 				e.printStackTrace();
@@ -267,6 +264,9 @@ public class SimpleHTTPServer {
 		public HTTPCodes() {
 		}
 
+		/**
+		 * Add appropriate response depdning on the status code
+		 */
 		public String toString(int status) {
 			switch (status) {
 			case 200:
