@@ -84,15 +84,15 @@ public class SimpleHTTPServer {
 			ReqObj request = null; //to be returned
 
 			String[] reqArr = req.split(" ");
-			if (reqArr.length < 2 || reqArr[0].length() < 3) {
+			if (reqArr.length < 2 || reqArr[0].length() < 3) { //make sure that method request is formated correctly
 
 				String bad = "bad request";
 				returnResponse(400, bad.getBytes());
 				return null;
-			} else {
+			} else { //set method
 				method = reqArr[0];
 			}
-			if (reqArr[1].length() > 1 && reqArr[1].charAt(0) == '/') {
+			if (reqArr[1].length() > 1 && reqArr[1].charAt(0) == '/') { //set paths to be merged
 				try {
 					relativePath = java.net.URLDecoder.decode(reqArr[1], "UTF-8");
 					workingDir = System.getProperty("user.dir");
@@ -100,8 +100,8 @@ public class SimpleHTTPServer {
 					e.printStackTrace();
 				}
 
-				fullPath = workingDir + relativePath;
-			}  else {
+				fullPath = workingDir + relativePath; //merge paths
+			}  else { //bad path request
 				String bad = "bad request";
 				returnResponse(400, bad.getBytes());
 				return null;
@@ -123,15 +123,15 @@ public class SimpleHTTPServer {
 				returnResponse(501, notImpl.getBytes());
 				break;
 			case "POST":
-				request.setMethod("GET");
+				request.setMethod("POST");
 				returnResponse(501, notImpl.getBytes());
 				break;
 			case "PUT":
-				request.setMethod("HEAD");
+				request.setMethod("PUT");
 				returnResponse(501, notImpl.getBytes());
 				break;
 			case "DELETE":
-				request.setMethod("GET");
+				request.setMethod("DELETE");
 				returnResponse(501, notImpl.getBytes());
 				break;
 			default:
@@ -148,9 +148,9 @@ public class SimpleHTTPServer {
 		private void doGet(ReqObj req) {
 			String filePath = req.getResource();
 			File file = new File(filePath);
-			if (file.exists() && !file.isDirectory()) {
+			if (file.exists() && !file.isDirectory()) { //file must not be a directory and has to exist
 				if (file.canRead()) { //file is readable
-					try {
+					try { //read and return contents of file
 						Path path = Paths.get(filePath);
 						byte[] contents = Files.readAllBytes(path);
 						returnResponse(200, contents);
@@ -176,7 +176,7 @@ public class SimpleHTTPServer {
 			// Prints the request along with other info about client
 			System.out.println(logBuilder(status));
 			try(PrintStream pstream = new PrintStream(clientSocket.getOutputStream())) {
-				HttpCodes codes = new HttpCodes();
+				HTTPCodes codes = new HTTPCodes();
 				pstream.println(codes.toString(status));
 				pstream.write(content);
 				pstream.flush();
@@ -214,6 +214,9 @@ public class SimpleHTTPServer {
 		}
 	}
 
+	/*
+	 * A request object holding the method type (GET, POST, etc.) and resource to be read
+	 */
 	class ReqObj {
 		private String httpMethod;
 		private String resource;
@@ -239,9 +242,9 @@ public class SimpleHTTPServer {
 		}
 	}
 
-	public class HttpCodes {
+	public class HTTPCodes {
 
-		public HttpCodes() {
+		public HTTPCodes() {
 		}
 
 		public String toString(int status) {
