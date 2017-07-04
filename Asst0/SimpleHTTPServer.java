@@ -83,7 +83,7 @@ public class SimpleHTTPServer{
 					returnResponse(400, "bad request");
 				} else{
 					method = req.substring(0, req.indexOf(" "));
-					suppliedPath = req.substring(req.indexOf(" ") + 1, req.length());
+					relativePath = req.substring(req.indexOf(" ") + 1, req.length());
 					workinDir = System.getProperty("user.dir");
 					fullPath = workingDir + relativePath;
 					request = new ReqObj(method, fullPath);
