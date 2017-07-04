@@ -7,13 +7,14 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.Path;
 
-
-
 public class SimpleHTTPServer {
 
 	ServerSocket serverSocket;
 	int port;
 
+	/**
+	 * Constructor
+	 */
 	SimpleHTTPServer(String[] args) {
 
 		// Initialize a serverSocket to accept clients
@@ -31,7 +32,7 @@ public class SimpleHTTPServer {
 			try {
 				// Accept the client
 				client = serverSocket.accept();
-				client.setSoTimeout(3000);
+				client.setSoTimeout(3000); //set timeout to 3000
 				HTTPThread clientThread = new HTTPThread(client);
 				Thread t = new Thread(clientThread);
 				t.start();
@@ -42,6 +43,9 @@ public class SimpleHTTPServer {
 		}
 	}
 
+	/*
+	 * Main method to instantiate server
+	 */
 	public static void main(String[] args) {
 		// Check that our arguments are correct. If not we print message and exit.
 		if (args.length != 1) {
@@ -52,6 +56,9 @@ public class SimpleHTTPServer {
 		return;
 	}
 
+	/**
+	 * Thread to handle each HTTP request
+	 */
 	class HTTPThread implements Runnable {
 		Socket clientSocket;
 		String reqStr;
@@ -60,6 +67,9 @@ public class SimpleHTTPServer {
 			this.clientSocket = c;
 		}
 
+		/**
+		 * Log exactly when the request was made
+		 */
 		private String logBuilder(int status) {
 			StringBuilder pre = new StringBuilder();
 			SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
@@ -74,7 +84,9 @@ public class SimpleHTTPServer {
 		}
 
 		/**
-		*This method will parse a request string and return a request object
+		* @param req- the request inputted by the user to be parsed
+		* @return a ReqObj containing the method and path to resource
+		* This method will parse a request string and return a request object
 		**/
 		private ReqObj parseReq(String req) {
 			String method = "";
@@ -103,6 +115,9 @@ public class SimpleHTTPServer {
 			return new ReqObj(method, fullPath);
 		}
 
+		/**
+		 * @param request- a ReqObj containing method and path filled in by parseReq
+		 */
 		public void doMethod(ReqObj request) {
 			String method = request.getMethod();
 			String fullPath = request.getResource();
@@ -180,7 +195,11 @@ public class SimpleHTTPServer {
 
 		}
 
+
 		@Override
+		/**
+		 * this method dictates what happens on each thread
+		 */
 		public void run() {
 			try(
 				    Socket client = clientSocket;
@@ -237,6 +256,9 @@ public class SimpleHTTPServer {
 		}
 	}
 
+	/**
+	 * Class containing the HTTP status codes to be set when necessary
+	 */
 	public class HTTPCodes {
 
 		public HTTPCodes() {
