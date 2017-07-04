@@ -25,7 +25,7 @@ public class SimpleHTTPServer {
 			e.printStackTrace();
 			return;
 		}
-
+		System.out.println("HTTP server listening on port "+port);
 		Socket client = null;
 		while (true) {
 			try {
@@ -85,25 +85,19 @@ public class SimpleHTTPServer {
 
 			String[] reqArr = req.split(" ");
 			if (reqArr.length < 2 || reqArr[0].length() < 3) { //make sure that method request is formated correctly
-
-				String bad = "bad request";
-				returnResponse(400, bad.getBytes());
 				return null;
 			} else { //set method
 				method = reqArr[0];
 			}
-			if (reqArr[1].length() > 1 && reqArr[1].charAt(0) == '/') { //set paths to be merged
+			if (reqArr[1].length() > 0 && reqArr[1].charAt(0) == '/') { //set paths to be merged
 				try {
 					relativePath = java.net.URLDecoder.decode(reqArr[1], "UTF-8");
 					workingDir = System.getProperty("user.dir");
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-
 				fullPath = workingDir + relativePath; //merge paths
 			}  else { //bad path request
-				String bad = "bad request";
-				returnResponse(400, bad.getBytes());
 				return null;
 			}
 			return new ReqObj(method, fullPath);
@@ -155,7 +149,7 @@ public class SimpleHTTPServer {
 						byte[] contents = Files.readAllBytes(path);
 						returnResponse(200, contents);
 					} catch (Exception e) {
-						// need 500 error here
+						returnResponse(500, "Internal Server Error".getBytes());
 						e.printStackTrace();
 					}
 				} else {
@@ -203,12 +197,13 @@ public class SimpleHTTPServer {
 				ReqObj req = parseReq(reqStr);
 				if (req != null) {
 					doMethod(req);
-				} else{
+				} else {
 					// just incase we get null object
 					returnResponse(400, "Bad Request".getBytes());
 				}
 				Thread.sleep(250);
 			} catch (Exception e) {
+				returnResponse(500, "Internal Server Error".getBytes());
 				e.printStackTrace();
 			}
 		}
