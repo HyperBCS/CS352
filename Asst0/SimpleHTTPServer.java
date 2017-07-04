@@ -22,10 +22,10 @@ public class SimpleHTTPServer{
 			System.out.println(e);
 			return;
 		}
-		
+
 		Socket client = null;
 		while(true){
-			try{			
+			try{
 				// Accept the client
 				client = serverSocket.accept();
 				HTTPThread clientThread = new HTTPThread(client);
@@ -71,14 +71,56 @@ public class SimpleHTTPServer{
 		*This method will parse a request string and return a request object
 		**/
 		private ReqObj parseReq(String req){
-			return null;
+			String method = "";
+			String workingDir = ""; //path of root directory
+			String relativePath = ""; //user supplied path
+			String fullPath = ""; //merge root dir with relative path
+
+			ReqObj request = null; //to be returned
+
+			if(req.contains(" ")){
+				if(((req.length() - req.replaceAll(" ", "")) > 1) || req.charAt(req.indexOf(" ") + 1) != '/' || req.matches("//+")){
+					returnResponse(400, "bad request");
+				} else{
+					method = req.substring(0, req.indexOf(" "));
+					suppliedPath = req.substring(req.indexOf(" ") + 1, req.length());
+					workinDir = System.getProperty("user.dir");
+					fullPath = workingDir + relativePath;
+					request = new ReqObj(method, fullPath);
+				}
+			}
+			return request;
 		}
 
 		/**
 		*This method will perform get a resource defined in the ReqObj. Then it will call return response with the correct status and content.
 		* If there is an error in fetching the resource give null content, and the correct code.
 		**/
-		private void doGet(ReqObj req){}
+		private void doGet(ReqObj req){
+				File file = new File(req.resource);
+				if(file.exists() && !file.isDirectory()){
+					if(file.canRead()){ //file is readable
+							InputStream inputStream = new FileInputStream(req.resource);
+							BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+
+							String str = bufferedReader.readLine();
+							StringBuilder stringBuilder = new StringBuilder();
+
+							while(str != null){
+								stringBuilder.append(str).append("\n");
+								str = bufferedReader.readLine();
+							}
+
+							String contents = stringBuilder.toString(); //store contents of the file as text in a String
+							System.out.println(contents);
+					} else{
+						returnResponse(400, "File not readable");
+					}
+				} else{
+						returnResponse(404, "File not found");
+				}
+
+		}
 
 		/**
 		*This method will take a status, and content to be returned to the user.
@@ -151,7 +193,7 @@ public class SimpleHTTPServer{
 	        switch (status) {
 	            case 200:
 	                return "HTTP/0.8 200 OK\r\n";
-	                    
+
 	            case 400:
 	                return "HTTP/0.8 200 Bad Request\r\n";
 
@@ -160,7 +202,7 @@ public class SimpleHTTPServer{
 
 	            case 500:
 	                return "HTTP/0.8 500 Internal Server Error\r\n";
-	                     
+
 	            case 404:
 	                return "HTTP/0.8 404 Not Found\r\n";
 
