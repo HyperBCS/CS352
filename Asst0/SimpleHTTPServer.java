@@ -33,7 +33,7 @@ public class SimpleHTTPServer{
 				t.start();
 			} catch(Exception e){
 				// When we catch the error, print it out
-				System.out.println(e);
+				e.printStackTrace();
 			}
 		}
 	}
