@@ -203,6 +203,9 @@ public class SimpleHTTPServer {
 				ReqObj req = parseReq(reqStr);
 				if (req != null) {
 					doMethod(req);
+				} else{
+					// just incase we get null object
+					returnResponse(400, "Bad Request".getBytes());
 				}
 				Thread.sleep(250);
 			} catch (Exception e) {
