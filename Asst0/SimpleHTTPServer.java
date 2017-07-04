@@ -20,6 +20,7 @@ public class SimpleHTTPServer{
 
 		} catch(Exception e){
 			System.out.println(e);
+			return;
 		}
 		
 		Socket client = null;
