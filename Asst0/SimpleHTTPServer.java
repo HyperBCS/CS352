@@ -41,6 +41,7 @@ public class SimpleHTTPServer {
 				e.printStackTrace();
 			}
 		}
+		client.close();
 	}
 
 	/*
@@ -80,6 +81,7 @@ public class SimpleHTTPServer {
 			pre.append(addr + ":" + port + " - ");
 			pre.append(reqStr + " - ");
 			pre.append(status);
+			clientSocket.close();
 			return pre.toString();
 		}
 
@@ -192,7 +194,7 @@ public class SimpleHTTPServer {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-
+			clientSocket.close();
 		}
 
 
@@ -221,6 +223,7 @@ public class SimpleHTTPServer {
 					returnResponse(400, "Bad Request".getBytes());
 				}
 				Thread.sleep(250);
+				client.close();
 			} catch (Exception e) {
 				returnResponse(500, "Internal Server Error".getBytes());
 				e.printStackTrace();
