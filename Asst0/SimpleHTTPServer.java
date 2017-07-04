@@ -80,7 +80,8 @@ public class SimpleHTTPServer{
 
 			if(req.contains(" ")){
 				if(((req.length() - req.replaceAll(" ", "")) > 1) || req.charAt(req.indexOf(" ") + 1) != '/' || req.matches("//+")){
-					returnResponse(400, "bad request");
+					String bad = "bad request"
+					returnResponse(400, bad.getBytes());
 				} else{
 					method = req.substring(0, req.indexOf(" "));
 					relativePath = req.substring(req.indexOf(" ") + 1, req.length());
@@ -111,13 +112,16 @@ public class SimpleHTTPServer{
 								str = bufferedReader.readLine();
 							}
 
-							String contents = stringBuilder.toString(); //store contents of the file as text in a String
-							System.out.println(contents);
+							String s = stringBuilder.toString(); //store contents of the file as text in a String
+							byte[] contents = s.getBytes();
+							returnResponse(200, contents);
 					} else{
-						returnResponse(400, "File not readable");
+						String notReadable = "File not readable";
+						returnResponse(400, notReadable.getBytes());
 					}
 				} else{
-						returnResponse(404, "File not found");
+						String fourOFour = "File not found";
+						returnResponse(404, fourOFour.getBytes());
 				}
 
 		}
