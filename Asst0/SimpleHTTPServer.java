@@ -76,25 +76,25 @@ public class SimpleHTTPServer {
 		private String codeString(int status) {
 			switch (status) {
 			case 200:
-				return "HTTP/0.8 200 OK\r\n";
+				return "200 OK\r\n";
 
 			case 400:
-				return "HTTP/0.8 400 Bad Request\r\n";
+				return "400 Bad Request\r\n";
 
 			case 501:
-				return "HTTP/0.8 501 Not Implemented\r\n";
+				return "501 Not Implemented\r\n";
 
 			case 500:
-				return "HTTP/0.8 500 Internal Server Error\r\n";
+				return "500 Internal Server Error\r\n";
 
 			case 404:
-				return "HTTP/0.8 404 Not Found\r\n";
+				return "404 Not Found\r\n";
 
 			case 408:
-				return "HTTP/0.8 408 Request Timeout\r\n";
+				return "408 Request Timeout\r\n";
 
 			default:
-				return "HTTP/0.8 200 OK\r\n";
+				return "200 OK\r\n";
 			}
 		}
 
