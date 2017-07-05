@@ -126,7 +126,7 @@ public class SimpleHTTPServer {
 
 			String[] reqArr = req.split(" ");
 			// Make sure that method request is formatted correctly
-			if (reqArr.length > 1 && reqArr[0].length() > 2) { 
+			if (reqArr.length > 1 && reqArr[0].length() > 2 && reqArr[0].toUpperCase().equals(reqArr[0])) { 
 				// set method
 				method = reqArr[0];
 			} else {
@@ -183,8 +183,7 @@ public class SimpleHTTPServer {
 				returnResponse(501, notImpl.getBytes());
 				break;
 			default:
-				String bad = "Bad Request";
-				returnResponse(400, bad.getBytes());
+				returnResponse(501, notImpl.getBytes());
 				break;
 			}
 		}
