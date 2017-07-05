@@ -235,6 +235,7 @@ public class SimpleHTTPServer {
 				pstream.println(codeString(status));
 				pstream.write(content);
 				pstream.flush();
+				Thread.sleep(250);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -263,7 +264,6 @@ public class SimpleHTTPServer {
 					// just incase we get null object
 					returnResponse(400, "Bad Request".getBytes());
 				}
-				Thread.sleep(250);
 			} catch (Exception e) {
 				returnResponse(500, "Internal Server Error".getBytes());
 				e.printStackTrace();
