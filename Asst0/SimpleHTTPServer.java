@@ -122,9 +122,12 @@ public class SimpleHTTPServer {
 		 *         object
 		 **/
 		private ReqObj parseReq(String req) {
-			String method;
-
+			// Make sure request isnt null
+			if(req == null){
+				return null;
+			}
 			String[] reqArr = req.split(" ");
+			String method;
 			// Make sure that method request is formatted correctly
 			if (reqArr.length > 1 && reqArr[0].length() > 2 && reqArr[0].toUpperCase().equals(reqArr[0])) { 
 				// set method
@@ -163,23 +166,18 @@ public class SimpleHTTPServer {
 			String notImpl = "Not Implemented";
 			switch (method) {
 			case "GET":
-				request.setMethod("GET");
 				doGet(request);
 				break;
 			case "HEAD":
-				request.setMethod("HEAD");
 				returnResponse(501, notImpl.getBytes());
 				break;
 			case "POST":
-				request.setMethod("POST");
 				returnResponse(501, notImpl.getBytes());
 				break;
 			case "PUT":
-				request.setMethod("PUT");
 				returnResponse(501, notImpl.getBytes());
 				break;
 			case "DELETE":
-				request.setMethod("DELETE");
 				returnResponse(501, notImpl.getBytes());
 				break;
 			default:
