@@ -125,25 +125,21 @@ public class SimpleHTTPServer {
 			String method;
 
 			String[] reqArr = req.split(" ");
-			if (reqArr.length > 2 && reqArr[0].length() > 3) { // make sure that
-																// method
-																// request is
-																// formated
-																// correctly
+			// Make sure that method request is formatted correctly
+			if (reqArr.length > 1 && reqArr[0].length() > 2) { 
 				// set method
 				method = reqArr[0];
 			} else {
 				return null;
 
 			}
-			if (reqArr[1].length() > 0 && reqArr[1].charAt(0) == '/') { // set
-																		// paths
-																		// to be
-																		// merged
+			// Set paths to be merged
+			if (reqArr[1].length() > 0 && reqArr[1].charAt(0) == '/') {
 				try {
 					String relativePath = java.net.URLDecoder.decode(reqArr[1], "UTF-8");
 					String workingDir = System.getProperty("user.dir");
-					String fullPath = workingDir + relativePath; // merge paths
+					File dir = new File(workingDir);
+					String fullPath = new File(dir,relativePath).getPath();
 					return new ReqObj(method, fullPath);
 				} catch (Exception e) {
 					e.printStackTrace();
