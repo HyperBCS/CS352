@@ -129,7 +129,7 @@ public class SimpleHTTPServer {
 			String[] reqArr = req.split(" ");
 			String method;
 			// Make sure that method request is formatted correctly
-			if (reqArr.length > 1 && reqArr[0].length() > 2 && reqArr[0].toUpperCase().equals(reqArr[0])) { 
+			if (reqArr.length == 2 && reqArr[0].length() > 0 && reqArr[0].toUpperCase().equals(reqArr[0])) { 
 				// set method
 				method = reqArr[0];
 			} else {
@@ -167,18 +167,6 @@ public class SimpleHTTPServer {
 			switch (method) {
 			case "GET":
 				doGet(request);
-				break;
-			case "HEAD":
-				returnResponse(501, notImpl.getBytes());
-				break;
-			case "POST":
-				returnResponse(501, notImpl.getBytes());
-				break;
-			case "PUT":
-				returnResponse(501, notImpl.getBytes());
-				break;
-			case "DELETE":
-				returnResponse(501, notImpl.getBytes());
 				break;
 			default:
 				returnResponse(501, notImpl.getBytes());
