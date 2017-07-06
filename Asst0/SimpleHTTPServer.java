@@ -129,7 +129,8 @@ public class SimpleHTTPServer {
 			String[] reqArr = req.split(" ");
 			String method;
 			// Make sure that method request is formatted correctly
-			if (reqArr.length == 2 && reqArr[0].length() > 0 && reqArr[0].toUpperCase().equals(reqArr[0])) { 
+			if (reqArr.length == 2 && reqArr[0].length() > 0 && reqArr[0].chars().allMatch(Character::isLetter)
+				&& reqArr[0].toUpperCase().equals(reqArr[0])) { 
 				// set method
 				method = reqArr[0];
 			} else {
