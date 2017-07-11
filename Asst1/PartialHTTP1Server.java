@@ -11,11 +11,14 @@ import java.nio.file.Paths;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class PartialHTTP1Server {
 
 	private ServerSocket serverSocket; // the main socket for the server
 	private int port; // which port it exists on gotten from command line
+	private static final Logger LOGGER = Logger.getLogger( PartialHTTP1Server.class.getName() );
 
 	/**
 	 * Constructor to start the server and creates a new thread for each
@@ -36,10 +39,10 @@ public class PartialHTTP1Server {
 	public void start() {
 		if (serverSocket != null && !serverSocket.isClosed()) {
 			System.out.println("HTTP 1.0 server listening on port " + port);
-			while (true) {
+			while (serverSocket.isBound()) {
 				try { // Accept the client
 					Socket client = serverSocket.accept();
-					client.setSoTimeout(30000); // set timeout to 3000
+					client.setSoTimeout(3000); // set timeout to 3000
 					HTTPThread clientThread = new HTTPThread(client);
 					Thread t = new Thread(clientThread);
 					t.start();
@@ -47,6 +50,7 @@ public class PartialHTTP1Server {
 					e.printStackTrace();
 				}
 			}
+			
 		}
 	}
 
@@ -123,7 +127,7 @@ public class PartialHTTP1Server {
 			StringBuilder pre = new StringBuilder();
 			SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 			Date date = new Date();
-			pre.append("[" + dateFormat.format(date) + "] ");
+//			pre.append("[" + dateFormat.format(date) + "] ");
 			String addr = clientSocket.getInetAddress().getHostName();
 			int clientPort = clientSocket.getPort();
 			pre.append(addr + ":" + clientPort + " - ");
@@ -299,7 +303,7 @@ public class PartialHTTP1Server {
 							Path path = Paths.get(file.toString());
 							contents = Files.readAllBytes(path);
 							req.setStatus(200);
-						} catch(AccessDeniedException e){
+						} catch (AccessDeniedException e) {
 							String notReadable = "Forbidden";
 							contents = notReadable.getBytes();
 							req.setStatus(403);
@@ -426,7 +430,8 @@ public class PartialHTTP1Server {
 		 *            Client
 		 **/
 		private void returnResponse(int status, byte[] content, long length, ReqObj request) {
-			System.out.println(logBuilder(status));
+			String log =  logBuilder(status);
+			LOGGER.log(Level.INFO, log);
 			String procHeader = doHeader(request, status);
 			try (PrintStream pstream = new PrintStream(clientSocket.getOutputStream())) {
 				pstream.println(codeString(status));
@@ -454,32 +459,24 @@ public class PartialHTTP1Server {
 					BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));) {
 				// Reads the request from the client
 				List<String> header = new ArrayList<>();
-				try {
-					reqStr = in.readLine();
-					// We got something so no more timeout
-					client.setSoTimeout(10000);
-					
-					while(true){
-						StringBuilder line = new StringBuilder();
-						char c = 0;
-						
-						while(c != '\n' && c != Character.MAX_VALUE){
-							c = (char)in.read();
-							line.append(Character.toString(c));
-						}
-						if(line.toString().equals("\r\n") || line.toString().equals("\n") || c == Character.MAX_VALUE){
-							break;
-						} else{
-							header.add(line.toString());
-						}
+				reqStr = in.readLine();
+				// We got something so no more timeout
+
+				while (true) {
+					StringBuilder line = new StringBuilder();
+					char c = 0;
+
+					while (c != '\n' && c != Character.MAX_VALUE) {
+						c = (char) in.read();
+						line.append(Character.toString(c));
 					}
-				} catch (SocketTimeoutException e) {
-					byte[] reqTimeout = "Request Timeout".getBytes();
-					returnResponse(408, reqTimeout, reqTimeout.length, null);
-					return;
+					if (line.toString().equals("\r\n") || line.toString().equals("\n") || c == Character.MAX_VALUE) {
+						break;
+					} else {
+						header.add(line.toString());
+					}
 				}
-				
-				
+
 				// Parse the request, we can do a switch case based on request
 				ReqObj req = parseReq(reqStr);
 				if (req != null) {
@@ -490,6 +487,10 @@ public class PartialHTTP1Server {
 					byte[] badReq = "Bad Request".getBytes();
 					returnResponse(400, badReq, badReq.length, null);
 				}
+			} catch (SocketTimeoutException e) {
+				byte[] reqTimeout = "Request Timeout".getBytes();
+				returnResponse(408, reqTimeout, reqTimeout.length, null);
+				return;
 			} catch (Exception e) {
 				byte[] serverError = "Internal Server Error".getBytes();
 				returnResponse(500, serverError, serverError.length, null);
