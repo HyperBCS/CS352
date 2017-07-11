@@ -1,7 +1,11 @@
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.io.*;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.Path;
@@ -67,7 +71,6 @@ public class PartialHTTP1Server {
 	class HTTPThread implements Runnable {
 		private Socket clientSocket;
 		private String reqStr;
-		private String[] header;
 
 		HTTPThread(Socket c) {
 			this.clientSocket = c;
@@ -138,7 +141,7 @@ public class PartialHTTP1Server {
 		 **/
 		private ReqObj parseReq(String req) {
 			// Make sure request isnt null
-			if(req == null){
+			if (req == null) {
 				return null;
 			}
 			String[] reqArr = req.split(" ");
@@ -146,7 +149,7 @@ public class PartialHTTP1Server {
 			float ver = 0;
 			// Make sure that method request is formatted correctly
 			if (reqArr.length == 3 && reqArr[0].length() > 0 && reqArr[0].chars().allMatch(Character::isLetter)
-				&& reqArr[0].toUpperCase().equals(reqArr[0])) { 
+					&& reqArr[0].toUpperCase().equals(reqArr[0])) {
 				// set method
 				method = reqArr[0];
 			} else {
@@ -154,18 +157,18 @@ public class PartialHTTP1Server {
 
 			}
 
-			if(reqArr[2].length() > 0){
+			if (reqArr[2].length() > 0) {
 				String[] verArr = reqArr[2].split("/");
-				if(verArr.length != 2){
+				if (verArr.length != 2) {
 					return null;
 				}
-				if(verArr[0].equals("HTTP") && verArr[1].split("\\.").length == 2){
-					try{
+				if (verArr[0].equals("HTTP") && verArr[1].split("\\.").length == 2) {
+					try {
 						ver = Float.parseFloat(verArr[1]);
-					} catch(Exception e){
+					} catch (Exception e) {
 						return null;
 					}
-				} else{
+				} else {
 					return null;
 				}
 			}
@@ -175,7 +178,7 @@ public class PartialHTTP1Server {
 					String relativePath = java.net.URLDecoder.decode(reqArr[1], "UTF-8");
 					String workingDir = System.getProperty("user.dir");
 					File dir = new File(workingDir);
-					String fullPath = new File(dir,relativePath).getPath();
+					File fullPath = new File(dir, relativePath);
 					return new ReqObj(method, fullPath, ver);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -188,6 +191,43 @@ public class PartialHTTP1Server {
 
 		}
 
+		private Date parseDate(String input) {
+			String inputDate = "";
+			if (input.charAt(0) == ' ') {
+				inputDate = input.substring(1);
+			}
+			SimpleDateFormat parser = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
+			parser.setTimeZone(TimeZone.getTimeZone("GMT"));
+			try {
+				return parser.parse(inputDate);
+
+			} catch (ParseException e) {
+				e.printStackTrace();
+				return null;
+			}
+		}
+
+		private void parseHeaderParam(String[] headerParts, ReqObj req) {
+			if (headerParts[0].equalsIgnoreCase("if-modified-since")) {
+				Date ifModified = parseDate(headerParts[1]);
+				if (ifModified != null) {
+					req.setIfModified(true);
+					req.setIfModifiedDate(ifModified);
+				}
+			}
+		}
+
+		private void parseHeader(List<String> header, ReqObj req) {
+			for (String headerStr : header) {
+				if (headerStr != null && headerStr.length() > 0) {
+					String[] headerParts = headerStr.split(":", 2);
+					if (headerParts.length == 2 && headerParts[0].length() > 0 && headerParts[1].length() > 0) {
+						parseHeaderParam(headerParts, req);
+					}
+				}
+			}
+		}
+
 		/**
 		 * @param request-
 		 *            a ReqObj containing method and path filled in by parseReq
@@ -198,41 +238,41 @@ public class PartialHTTP1Server {
 			String method = request.getMethod(); // store method
 			float ver = request.getVer();
 			String notImpl = "Not Implemented";
-			String badrReq = "Bad Request";
+			String badReq = "Bad Request";
 			String wrongVer = "HTTP Version Not Supported";
-			String procHeader = doHeader(request);
-			request.setHeader(procHeader);
-			if(ver > 0 && ver <= 1.0){
+			if (ver > 0 && ver <= 1.0) {
+				getFileInfo(request);
 				switch (method) {
 				case "GET":
-					doGet(request);
+					doGet(request, false);
 					break;
 				case "POST":
-					doGet(request);
+					doGet(request, false);
 					break;
 				case "HEAD":
-					doGet(request);
+					doGet(request, true);
 					break;
 				case "DELETE":
-					returnResponse(501, procHeader, notImpl.getBytes());
+					returnResponse(501, notImpl.getBytes(), notImpl.length(), request);
 					break;
 				case "PUT":
-					returnResponse(501, procHeader, notImpl.getBytes());
+					returnResponse(501, notImpl.getBytes(), notImpl.length(), request);
 					break;
 				case "LINK":
-					returnResponse(501, procHeader, notImpl.getBytes());
+					returnResponse(501, notImpl.getBytes(), notImpl.length(), request);
 					break;
 				case "UNLINK":
-					returnResponse(501, procHeader, notImpl.getBytes());
+					returnResponse(501, notImpl.getBytes(), notImpl.length(), request);
 					break;
 				default:
-					returnResponse(400, procHeader, notImpl.getBytes());
+					returnResponse(400, badReq.getBytes(), badReq.length(), request);
 					break;
 				}
-			}else{
-			returnResponse(505, procHeader, wrongVer.getBytes());
+			} else {
+				returnResponse(505, wrongVer.getBytes(), wrongVer.length(), request);
 			}
 		}
+
 		/**
 		 * @param req-
 		 *            the GET request This method will perform get a resource
@@ -241,102 +281,136 @@ public class PartialHTTP1Server {
 		 *            in fetching the resource give null content, and the
 		 *            correct code.
 		 **/
-		private void doGet(ReqObj req) {
-			String filePath = req.getResource();
-			File file = new File(filePath);
-			String procHeader = req.getHeader();
+		private void doGet(ReqObj req, boolean head) {
+			File file = req.getResource();
+			byte[] contents = "".getBytes();
 			// file must not be a directory and has to exist
 			if (file.exists() && !file.isDirectory()) {
-				if (file.canRead()) { // file is readable
-					try { // read and return contents of file
-						Path path = Paths.get(filePath);
-						byte[] contents = Files.readAllBytes(path);
-						returnResponse(200, procHeader, contents);
-					} catch (Exception e) {
-						returnResponse(500, procHeader, "Internal Server Error".getBytes());
-						e.printStackTrace();
+				if (req.ifModified) {
+					long lastModified = req.getDate().getTime();
+					long ifModified = req.ifModifiedDate.getTime();
+					if (lastModified < ifModified) {
+						req.setStatus(304);
 					}
-				} else {
-					String notReadable = "Forbidden";
-					returnResponse(403, procHeader, notReadable.getBytes());
+				}
+				if (req.getStatus() != 304) {
+					if (file.canRead()) { // file is readable
+						try { // read and return contents of file
+							Path path = Paths.get(file.toString());
+							contents = Files.readAllBytes(path);
+							req.setStatus(200);
+						} catch(AccessDeniedException e){
+							String notReadable = "Forbidden";
+							contents = notReadable.getBytes();
+							req.setStatus(403);
+						} catch (Exception e) {
+							req.setStatus(500);
+							contents = "Internal Server Error".getBytes();
+							e.printStackTrace();
+						}
+					} else {
+						String notReadable = "Forbidden";
+						contents = notReadable.getBytes();
+						req.setStatus(403);
+					}
 				}
 			} else {
 				String fourOFour = "File not found";
-				returnResponse(404, procHeader, fourOFour.getBytes());
+				contents = fourOFour.getBytes();
+				req.setStatus(404);
+			}
+			if (!head && req.getStatus() != 304) {
+				returnResponse(req.getStatus(), contents, contents.length, req);
+			} else {
+				returnResponse(req.getStatus(), null, contents.length, req);
 			}
 
 		}
 
-		private void getFileInfo(ReqObj req){
-			String filePath = req.getResource();
-			File file = new File(filePath);
-			// file must not be a directory and has to exist
-			if (file.exists() && !file.isDirectory()) {
-				Path path = Paths.get(filePath);
-				req.setDate(new Date(file.lastModified()));
-				req.setSize(file.length());
-				if (file.canRead() && file.canWrite()) { // file is readable/writable
-					req.setPerm(2);
-				} else if(file.canRead()){
-					req.setPerm(1);
+		private void getFileInfo(ReqObj req) {
+			if (req != null) {
+				File file = req.getResource();
+				// file must not be a directory and has to exist
+				if (file.exists() && !file.isDirectory()) {
+					req.setDate(new Date(file.lastModified()));
+					req.setSize(file.length());
+					if (file.canRead() && file.canWrite()) { // file is
+																// readable/writable
+						req.setPerm(2);
+					} else if (file.canRead()) {
+						req.setPerm(1);
+					}
+				} else {
+					req.setPerm(0);
 				}
-			} else {
-				req.setPerm(0);
 			}
 		}
 
 		private String getServerTime(Date date) {
 			SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
 			dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-		    return dateFormat.format(date);
+			return dateFormat.format(date);
 		}
 
-		private String getMIME(String ext){
-			switch(ext){
-				case "txt":
-					return "text/plain";
-				case "html":
-					return "text/" + ext;
-				case "gif":
-				case "jpeg":
-				case "png":
-					return "image/" + ext;
-				case "gz":
-				case "gzip":
-					return "application/x-gzip";
-				case "zip":
-					return "application/zip";
-				default:
-					return "application/octet-stream";
+		private String getMIME(String ext) {
+			switch (ext) {
+			case "txt":
+			case "c":
+			case "cc":
+			case "h":
+				return "text/plain";
+			case "css":
+				return "text/css";
+			case "html":
+			case "htm":
+				return "text/html";
+			case "jpeg":
+			case "jpe":
+			case "jpg":
+				return "image/jpeg";
+			case "js":
+				return "application/x-javascript";
+			case "gif":
+			case "png":
+				return "image/" + ext;
+			case "gz":
+			case "gzip":
+				return "application/x-gzip";
+			case "zip":
+			case "pdf":
+				return "application/" + ext;
+			default:
+				return "application/octet-stream";
 			}
 		}
 
-		private String doHeader(ReqObj obj){
+		private String doHeader(ReqObj obj, int status) {
 			String date = getServerTime(new Date());
 			StringBuilder header = new StringBuilder();
-			String[] extArr = {""};
+			String[] extArr = null;
 			String ext = "";
-			if(obj != null){
-				extArr = obj.getResource().split("\\.");
-				ext = extArr[extArr.length-1].toLowerCase();
+			if (obj != null) {
+				String filePath = obj.getResource().toString();
+				extArr = filePath.split("\\.");
+				ext = extArr[extArr.length - 1].toLowerCase();
 			}
 			header.append("Date: " + date);
 			header.append("\n");
-			header.append("Server: PartialHTTP1Server/1.0");
+			header.append("Allow: GET, POST, HEAD");
 			header.append("\n");
-			header.append("Allow: GET, HEAD, POST");
+			header.append("Content-Encoding: identity");
 			header.append("\n");
-			getFileInfo(obj);
-			if(obj.getPerm() > 0){
-				header.append("Expires: " + getServerTime(new Date()));
+			if (obj != null && status == 200) {
+				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
+				header.append("Expires: " + getServerTime(nowYear));
 				header.append("\n");
 				header.append("Last-Modified: " + getServerTime(obj.getDate()));
 				header.append("\n");
 				header.append("Content-Type: " + getMIME(ext));
 				header.append("\n");
-			} else{
+			} else {
 				// Content length for 404?
-				header.append("Content-Type: " + getMIME("html"));
+				header.append("Content-Type: " + getMIME("txt"));
 				header.append("\n");
 			}
 			return header.toString();
@@ -351,14 +425,18 @@ public class PartialHTTP1Server {
 		 *            to client Print request and other info pertianing to the
 		 *            Client
 		 **/
-		private void returnResponse(int status, String procHeader, byte[] content) {
+		private void returnResponse(int status, byte[] content, long length, ReqObj request) {
 			System.out.println(logBuilder(status));
-
+			String procHeader = doHeader(request, status);
 			try (PrintStream pstream = new PrintStream(clientSocket.getOutputStream())) {
 				pstream.println(codeString(status));
 				pstream.write(procHeader.getBytes());
-				pstream.write(("Content-Length: " + content.length + "\n\n").getBytes());
-				pstream.write(content);
+				if (content != null) {
+					pstream.write(("Content-Length: " + content.length + "\n\n").getBytes());
+					pstream.write(content);
+				} else if (length != 0) {
+					pstream.write(("Content-Length: " + length + "\n\n").getBytes());
+				}
 				pstream.flush();
 				Thread.sleep(250);
 			} catch (Exception e) {
@@ -375,26 +453,46 @@ public class PartialHTTP1Server {
 			try (Socket client = clientSocket;
 					BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));) {
 				// Reads the request from the client
+				List<String> header = new ArrayList<>();
 				try {
 					reqStr = in.readLine();
 					// We got something so no more timeout
-					client.setSoTimeout(0);
+					client.setSoTimeout(10000);
+					
+					while(true){
+						StringBuilder line = new StringBuilder();
+						char c = 0;
+						
+						while(c != '\n' && c != Character.MAX_VALUE){
+							c = (char)in.read();
+							line.append(Character.toString(c));
+						}
+						if(line.toString().equals("\r\n") || line.toString().equals("\n") || c == Character.MAX_VALUE){
+							break;
+						} else{
+							header.add(line.toString());
+						}
+					}
 				} catch (SocketTimeoutException e) {
-
-					returnResponse(408, doHeader(null), "Request Timeout".getBytes());
+					byte[] reqTimeout = "Request Timeout".getBytes();
+					returnResponse(408, reqTimeout, reqTimeout.length, null);
 					return;
 				}
-
+				
+				
 				// Parse the request, we can do a switch case based on request
 				ReqObj req = parseReq(reqStr);
 				if (req != null) {
+					parseHeader(header, req);
 					doMethod(req);
 				} else {
 					// just incase we get null object
-					returnResponse(400, doHeader(null), "Bad Request".getBytes());
+					byte[] badReq = "Bad Request".getBytes();
+					returnResponse(400, badReq, badReq.length, null);
 				}
 			} catch (Exception e) {
-				returnResponse(500, doHeader(null), "Internal Server Error".getBytes());
+				byte[] serverError = "Internal Server Error".getBytes();
+				returnResponse(500, serverError, serverError.length, null);
 				e.printStackTrace();
 			}
 		}
@@ -406,57 +504,75 @@ public class PartialHTTP1Server {
 	 */
 	class ReqObj {
 		private String httpMethod;
-		private String resource;
+		private File resource;
 		private float httpVer;
 		private long fileSize = 0;
 		// perm: 0=doesnt exist, 1=read/no write, 2=read/write
 		private int perm = 0;
 		private Date modified;
-		private String procHeader;
+		private int status = 0;
+		private boolean ifModified = false;
+		private Date ifModifiedDate;
 
-		ReqObj(String httpMethod, String resource, float httpVer) {
+		ReqObj(String httpMethod, File resource, float httpVer) {
 			this.httpMethod = httpMethod;
 			this.resource = resource;
 			this.httpVer = httpVer;
 		}
 
-		public String getHeader(){
-			return this.procHeader;
+		public boolean getIfModified() {
+			return ifModified;
 		}
 
-		public void setHeader(String procHeader){
-			this.procHeader = procHeader;
+		public void setIfModified(boolean ifModified) {
+			this.ifModified = ifModified;
 		}
 
-		public Date getDate(){
+		public Date getIfModifiedDate() {
+			return this.ifModifiedDate;
+		}
+
+		public void setIfModifiedDate(Date ifModifiedDate) {
+			this.ifModifiedDate = ifModifiedDate;
+		}
+
+		public int getStatus() {
+			return this.status;
+		}
+
+		public void setStatus(int status) {
+			this.status = status;
+		}
+
+		public Date getDate() {
 			return this.modified;
 		}
 
-		public void setDate(Date modified){
+		public void setDate(Date modified) {
 			this.modified = modified;
 		}
 
-		public long getSize(){
+		public long getSize() {
 			return this.fileSize;
 		}
 
-		public void setSize(long size){
+		public void setSize(long size) {
 			this.fileSize = size;
 		}
 
-		public void setPerm(int perm){
+		public void setPerm(int perm) {
 			this.perm = perm;
 		}
 
-		public int getPerm(){
+		public int getPerm() {
 			return this.perm;
 		}
 
-		public float getVer(){
+		public float getVer() {
 			return this.httpVer;
 		}
 
-		public void setVer(float httpVer){
+		public void setVer(float httpVer) {
 			this.httpVer = httpVer;
 		}
 
@@ -468,11 +584,11 @@ public class PartialHTTP1Server {
 			this.httpMethod = httpMethod;
 		}
 
-		public String getResource() {
+		public File getResource() {
 			return this.resource;
 		}
 
-		public void setResource(String resource) {
+		public void setResource(File resource) {
 			this.resource = resource;
 		}
 	}
