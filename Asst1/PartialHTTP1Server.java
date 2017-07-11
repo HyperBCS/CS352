@@ -395,23 +395,23 @@ public class PartialHTTP1Server {
 				ext = extArr[extArr.length - 1].toLowerCase();
 			}
 			header.append("Date: " + date);
-			header.append("\n");
+			header.append("\r\n");
 			header.append("Allow: GET, POST, HEAD");
-			header.append("\n");
+			header.append("\r\n");
 			header.append("Content-Encoding: identity");
-			header.append("\n");
+			header.append("\r\n");
 			if (obj != null && status == 200) {
 				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
 				header.append("Expires: " + getServerTime(nowYear));
-				header.append("\n");
+				header.append("\r\n");
 				header.append("Last-Modified: " + getServerTime(obj.getDate()));
-				header.append("\n");
+				header.append("\r\n");
 				header.append("Content-Type: " + getMIME(ext));
-				header.append("\n");
+				header.append("\r\n");
 			} else {
 				// Content length for 404?
 				header.append("Content-Type: " + getMIME("txt"));
-				header.append("\n");
+				header.append("\r\n");
 			}
 			return header.toString();
 
@@ -432,10 +432,10 @@ public class PartialHTTP1Server {
 				pstream.println(codeString(status));
 				pstream.write(procHeader.getBytes());
 				if (content != null) {
-					pstream.write(("Content-Length: " + content.length + "\n\n").getBytes());
+					pstream.write(("Content-Length: " + content.length + "\r\n\r\n").getBytes());
 					pstream.write(content);
 				} else if (length != 0) {
-					pstream.write(("Content-Length: " + length + "\n\n").getBytes());
+					pstream.write(("Content-Length: " + length + "\r\n\r\n").getBytes());
 				}
 				pstream.flush();
 				Thread.sleep(250);
