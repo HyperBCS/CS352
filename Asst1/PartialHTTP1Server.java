@@ -97,37 +97,37 @@ public class PartialHTTP1Server {
 		private String codeString(int status) {
 			switch (status) {
 			case 200:
-				return "HTTP/1.0 200 OK\r";
+				return "HTTP/1.0 200 OK";
 
 			case 304:
-				return "HTTP/1.0 304 Not Modified\r";
+				return "HTTP/1.0 304 Not Modified";
 
 			case 400:
-				return "HTTP/1.0 400 Bad Request\r";
+				return "HTTP/1.0 400 Bad Request";
 
 			case 403:
-				return "HTTP/1.0 403 Forbidden\r";
+				return "HTTP/1.0 403 Forbidden";
 
 			case 404:
-				return "HTTP/1.0 404 Not Found\r";
+				return "HTTP/1.0 404 Not Found";
 
 			case 408:
-				return "HTTP/1.0 408 Request Timeout\r";
+				return "HTTP/1.0 408 Request Timeout";
 
 			case 500:
-				return "HTTP/1.0 500 Internal Server Error\r";
+				return "HTTP/1.0 500 Internal Server Error";
 
 			case 501:
-				return "HTTP/1.0 501 Not Implemented\r";
+				return "HTTP/1.0 501 Not Implemented";
 
 			case 503:
-				return "HTTP/1.0 503 Service Unavailable\r";
+				return "HTTP/1.0 503 Service Unavailable";
 
 			case 505:
-				return "HTTP/1.0 505 HTTP Version Not Supported\r";
+				return "HTTP/1.0 505 HTTP Version Not Supported";
 
 			default:
-				return "HTTP/1.0 200 OK\r";
+				return "HTTP/1.0 200 OK";
 			}
 		}
 
@@ -441,7 +441,7 @@ public class PartialHTTP1Server {
 			LOGGER.log(Level.INFO, log);
 			String procHeader = doHeader(request, status);
 			try (PrintStream pstream = new PrintStream(clientSocket.getOutputStream())) {
-				pstream.println(codeString(status));
+				pstream.write((codeString(status) + "\r\n").getBytes());
 				pstream.write(procHeader.getBytes());
 				if (content != null) {
 					pstream.write(("Content-Length: " + content.length + "\r\n\r\n").getBytes());
