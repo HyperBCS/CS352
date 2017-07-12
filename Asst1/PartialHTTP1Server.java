@@ -18,11 +18,10 @@ public class PartialHTTP1Server {
 
 	private ServerSocket serverSocket; // the main socket for the server
 	private int port; // which port it exists on gotten from command line
-	private static final Logger LOGGER = Logger.getLogger( PartialHTTP1Server.class.getName() );
+	private static final Logger LOGGER = Logger.getLogger(PartialHTTP1Server.class.getName());
 
 	/**
-	 * Constructor to start the server and creates a new thread for each
-	 * connection
+	 * Constructor to start the server and creates a new thread for each connection
 	 */
 	PartialHTTP1Server(String[] args) {
 
@@ -32,59 +31,35 @@ public class PartialHTTP1Server {
 			this.serverSocket = new ServerSocket(port);
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			String error = getStackTrace(e);
+			LOGGER.log(Level.SEVERE, error);
 		}
+	}
+
+	public static String getStackTrace(final Throwable throwable) {
+		final StringWriter sw = new StringWriter();
+		final PrintWriter pw = new PrintWriter(sw, true);
+		throwable.printStackTrace(pw);
+		return sw.getBuffer().toString();
 	}
 
 	public void start() {
-		int connections = 0;
-		final int MAX_THREADS = 50;
-		final int MIN_THREADS = 5;
-		List<Thread> clients = new LinkedList<Thread>();
 		if (serverSocket != null && !serverSocket.isClosed()) {
-			System.out.println("HTTP 1.0 server listening on port " + port);
+			String usage = "HTTP 1.0 server listening on port " + port;
+			LOGGER.log(Level.INFO, usage);
 			while (serverSocket.isBound()) {
-				while(clients.size() >= MIN_THREADS && clients.size() <= MAX_THREADS){
-					try { // Accept the client
-						Socket client = serverSocket.accept();
-						client.setSoTimeout(3000); // set timeout to 3000
-						HTTPThread clientThread = new HTTPThread(client);
-						Thread t = new Thread(clientThread);
-						t.start();
-						clients.add(t);
-					} catch (Exception e) { // When we catch the error, print it out
-						e.printStackTrace();
-					}
+				try { // Accept the client
+					Socket client = serverSocket.accept();
+					client.setSoTimeout(3000); // set timeout to 3000
+					HTTPThread clientThread = new HTTPThread(client);
+					Thread t = new Thread(clientThread);
+					t.start();
+				} catch (Exception e) { // When we catch the error, print it out
+					String error = getStackTrace(e);
+					LOGGER.log(Level.SEVERE, error);
 				}
 			}
-		}
-	}
 
-	/**
-	 * @param status-
-	 *            the status code to be returned
-	 * @param content-
-	 *            a byte array containing the contents of what needs to get
-	 *            to client Print request and other info pertianing to the
-	 *            Client
-	 **/
-	private void returnResponse(int status, byte[] content, long length, ReqObj request) {
-		String log =  logBuilder(status);
-		LOGGER.log(Level.INFO, log);
-		String procHeader = doHeader(request, status);
-		try (PrintStream pstream = new PrintStream(clientSocket.getOutputStream())) {
-			pstream.println(codeString(status));
-			pstream.write(procHeader.getBytes());
-			if (content != null) {
-				pstream.write(("Content-Length: " + content.length + "\r\n\r\n").getBytes());
-				pstream.write(content);
-			} else if (length != 0) {
-				pstream.write(("Content-Length: " + length + "\r\n\r\n").getBytes());
-			}
-			pstream.flush();
-			Thread.sleep(250);
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -95,9 +70,11 @@ public class PartialHTTP1Server {
 		// Check that our arguments are correct. If not we print message and
 		// exit.
 		if (args.length != 1) {
-			System.out.println("Usage: java -cp . PartialHTTP1Server 3456");
+			LOGGER.log(Level.INFO, "Usage: java -cp . PartialHTTP1Server 3456");
 			return;
 		}
+		System.setProperty("java.util.logging.SimpleFormatter.format",
+				"[%1$tm/%1$td/%1$tY %1$tH:%1$tM:%1$tS] %5$s%6$s%n");
 		PartialHTTP1Server server = new PartialHTTP1Server(args);
 		server.start();
 		return;
@@ -120,37 +97,37 @@ public class PartialHTTP1Server {
 		private String codeString(int status) {
 			switch (status) {
 			case 200:
-				return "HTTP/1.0 200 OK\r";
+				return "HTTP/1.0 200 OK";
 
 			case 304:
-				return "HTTP/1.0 304 Not Modified\r";
+				return "HTTP/1.0 304 Not Modified";
 
 			case 400:
-				return "HTTP/1.0 400 Bad Request\r";
+				return "HTTP/1.0 400 Bad Request";
 
 			case 403:
-				return "HTTP/1.0 403 Forbidden\r";
+				return "HTTP/1.0 403 Forbidden";
 
 			case 404:
-				return "HTTP/1.0 404 Not Found\r";
+				return "HTTP/1.0 404 Not Found";
 
 			case 408:
-				return "HTTP/1.0 408 Request Timeout\r";
+				return "HTTP/1.0 408 Request Timeout";
 
 			case 500:
-				return "HTTP/1.0 500 Internal Server Error\r";
+				return "HTTP/1.0 500 Internal Server Error";
 
 			case 501:
-				return "HTTP/1.0 501 Not Implemented\r";
+				return "HTTP/1.0 501 Not Implemented";
 
 			case 503:
-				return "HTTP/1.0 503 Service Unavailable\r";
+				return "HTTP/1.0 503 Service Unavailable";
 
 			case 505:
-				return "HTTP/1.0 505 HTTP Version Not Supported\r";
+				return "HTTP/1.0 505 HTTP Version Not Supported";
 
 			default:
-				return "HTTP/1.0 200 OK\r";
+				return "HTTP/1.0 200 OK";
 			}
 		}
 
@@ -159,9 +136,6 @@ public class PartialHTTP1Server {
 		 */
 		private String logBuilder(int status) {
 			StringBuilder pre = new StringBuilder();
-			SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
-			Date date = new Date();
-//			pre.append("[" + dateFormat.format(date) + "] ");
 			String addr = clientSocket.getInetAddress().getHostName();
 			int clientPort = clientSocket.getPort();
 			pre.append(addr + ":" + clientPort + " - ");
@@ -173,9 +147,8 @@ public class PartialHTTP1Server {
 		/**
 		 * @param req-
 		 *            the request inputted by the user to be parsed
-		 * @return a ReqObj containing the method and path to resource This
-		 *         method will parse a request string and return a request
-		 *         object
+		 * @return a ReqObj containing the method and path to resource This method will
+		 *         parse a request string and return a request object
 		 **/
 		private ReqObj parseReq(String req) {
 			// Make sure request isnt null
@@ -219,7 +192,8 @@ public class PartialHTTP1Server {
 					File fullPath = new File(dir, relativePath);
 					return new ReqObj(method, fullPath, ver);
 				} catch (Exception e) {
-					e.printStackTrace();
+					String error = getStackTrace(e);
+					LOGGER.log(Level.SEVERE, error);
 					return null;
 				}
 
@@ -240,7 +214,8 @@ public class PartialHTTP1Server {
 				return parser.parse(inputDate);
 
 			} catch (ParseException e) {
-				e.printStackTrace();
+				String error = getStackTrace(e);
+				LOGGER.log(Level.SEVERE, error);
 				return null;
 			}
 		}
@@ -268,9 +243,8 @@ public class PartialHTTP1Server {
 
 		/**
 		 * @param request-
-		 *            a ReqObj containing method and path filled in by parseReq
-		 *            this method will perform the requested method, though only
-		 *            GET works.
+		 *            a ReqObj containing method and path filled in by parseReq this
+		 *            method will perform the requested method, though only GET works.
 		 */
 		public void doMethod(ReqObj request) {
 			String method = request.getMethod(); // store method
@@ -313,11 +287,10 @@ public class PartialHTTP1Server {
 
 		/**
 		 * @param req-
-		 *            the GET request This method will perform get a resource
-		 *            defined in the ReqObj. Then it will call return response
-		 *            with the correct status and content. If there is an error
-		 *            in fetching the resource give null content, and the
-		 *            correct code.
+		 *            the GET request This method will perform get a resource defined in
+		 *            the ReqObj. Then it will call return response with the correct
+		 *            status and content. If there is an error in fetching the resource
+		 *            give null content, and the correct code.
 		 **/
 		private void doGet(ReqObj req, boolean head) {
 			File file = req.getResource();
@@ -344,7 +317,8 @@ public class PartialHTTP1Server {
 						} catch (Exception e) {
 							req.setStatus(500);
 							contents = "Internal Server Error".getBytes();
-							e.printStackTrace();
+							String error = getStackTrace(e);
+							LOGGER.log(Level.SEVERE, error);
 						}
 					} else {
 						String notReadable = "Forbidden";
@@ -438,7 +412,7 @@ public class PartialHTTP1Server {
 			header.append("\r\n");
 			header.append("Content-Encoding: identity");
 			header.append("\r\n");
-			if (obj != null && status == 200) {
+			if (obj != null && (status == 200 || status == 304)) {
 				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
 				header.append("Expires: " + getServerTime(nowYear));
 				header.append("\r\n");
@@ -459,38 +433,41 @@ public class PartialHTTP1Server {
 		 * @param status-
 		 *            the status code to be returned
 		 * @param content-
-		 *            a byte array containing the contents of what needs to get
-		 *            to client Print request and other info pertianing to the
-		 *            Client
+		 *            a byte array containing the contents of what needs to get to
+		 *            client Print request and other info pertianing to the Client
 		 **/
 		private void returnResponse(int status, byte[] content, long length, ReqObj request) {
-			String log =  logBuilder(status);
+			String log = logBuilder(status);
 			LOGGER.log(Level.INFO, log);
 			String procHeader = doHeader(request, status);
 			try (PrintStream pstream = new PrintStream(clientSocket.getOutputStream())) {
-				pstream.println(codeString(status));
+				pstream.write((codeString(status) + "\r\n").getBytes());
 				pstream.write(procHeader.getBytes());
 				if (content != null) {
 					pstream.write(("Content-Length: " + content.length + "\r\n\r\n").getBytes());
 					pstream.write(content);
+					pstream.write("\r\n".getBytes());
 				} else if (length != 0) {
 					pstream.write(("Content-Length: " + length + "\r\n\r\n").getBytes());
 				}
 				pstream.flush();
 				Thread.sleep(250);
 			} catch (Exception e) {
-				e.printStackTrace();
+				String error = getStackTrace(e);
+				LOGGER.log(Level.SEVERE, error);
 			}
 		}
 
 		@Override
 		/**
-		 * perform the client request if appropriate and within the alloted time
-		 * of 3s
+		 * perform the client request if appropriate and within the alloted time of 3s
 		 */
 		public void run() {
-			try (Socket client = clientSocket;
-					BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));) {
+			Socket client = null;
+			BufferedReader in = null;
+			try {
+				client = clientSocket;
+				in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 				// Reads the request from the client
 				List<String> header = new ArrayList<>();
 				reqStr = in.readLine();
@@ -524,18 +501,28 @@ public class PartialHTTP1Server {
 			} catch (SocketTimeoutException e) {
 				byte[] reqTimeout = "Request Timeout".getBytes();
 				returnResponse(408, reqTimeout, reqTimeout.length, null);
-				return;
 			} catch (Exception e) {
 				byte[] serverError = "Internal Server Error".getBytes();
 				returnResponse(500, serverError, serverError.length, null);
-				e.printStackTrace();
+				String error = getStackTrace(e);
+				LOGGER.log(Level.SEVERE, error);
+			} finally {
+				try {
+					if (client != null)
+						client.close();
+					if (in != null)
+						in.close();
+				} catch (Exception e) {
+					String error = getStackTrace(e);
+					LOGGER.log(Level.SEVERE, error);
+				}
 			}
 		}
 	}
 
 	/*
-	 * A request object holding the method type (GET, POST, etc.) and resource
-	 * to be read
+	 * A request object holding the method type (GET, POST, etc.) and resource to be
+	 * read
 	 */
 	class ReqObj {
 		private String httpMethod;
