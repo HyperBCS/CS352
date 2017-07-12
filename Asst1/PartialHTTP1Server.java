@@ -490,7 +490,6 @@ public class PartialHTTP1Server {
 			} catch (SocketTimeoutException e) {
 				byte[] reqTimeout = "Request Timeout".getBytes();
 				returnResponse(408, reqTimeout, reqTimeout.length, null);
-				return;
 			} catch (Exception e) {
 				byte[] serverError = "Internal Server Error".getBytes();
 				returnResponse(500, serverError, serverError.length, null);
