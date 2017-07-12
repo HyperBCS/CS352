@@ -35,12 +35,12 @@ public class PartialHTTP1Server {
 			LOGGER.log(Level.SEVERE, error);
 		}
 	}
-	
+
 	public static String getStackTrace(final Throwable throwable) {
-	     final StringWriter sw = new StringWriter();
-	     final PrintWriter pw = new PrintWriter(sw, true);
-	     throwable.printStackTrace(pw);
-	     return sw.getBuffer().toString();
+		final StringWriter sw = new StringWriter();
+		final PrintWriter pw = new PrintWriter(sw, true);
+		throwable.printStackTrace(pw);
+		return sw.getBuffer().toString();
 	}
 
 	public void start() {
@@ -412,7 +412,7 @@ public class PartialHTTP1Server {
 			header.append("\r\n");
 			header.append("Content-Encoding: identity");
 			header.append("\r\n");
-			if (obj != null && status == 200) {
+			if (obj != null && (status == 200 || status == 304)) {
 				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
 				header.append("Expires: " + getServerTime(nowYear));
 				header.append("\r\n");
@@ -446,6 +446,7 @@ public class PartialHTTP1Server {
 				if (content != null) {
 					pstream.write(("Content-Length: " + content.length + "\r\n\r\n").getBytes());
 					pstream.write(content);
+					pstream.write("\r\n".getBytes());
 				} else if (length != 0) {
 					pstream.write(("Content-Length: " + length + "\r\n\r\n").getBytes());
 				}
