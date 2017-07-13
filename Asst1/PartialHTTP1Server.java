@@ -188,6 +188,8 @@ public class PartialHTTP1Server {
 				}
 				if (verArr[0].equals("HTTP") && verArr[1].split("\\.").length == 2) {
 					try {
+						String[] verNum = verArr[1].split("\\.");
+						if(verNum[0].length() != 1 || verNum[1].length() != 1) return null;
 						ver = Float.parseFloat(verArr[1]);
 					} catch (Exception e) {
 						return null;
