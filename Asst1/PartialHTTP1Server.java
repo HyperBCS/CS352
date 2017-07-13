@@ -11,6 +11,12 @@ import java.nio.file.Paths;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -46,15 +52,22 @@ public class PartialHTTP1Server {
 	public void start() {
 		if (serverSocket != null && !serverSocket.isClosed()) {
 			String usage = "HTTP 1.0 server listening on port " + port;
-			LOGGER.log(Level.INFO, usage);
-			while (serverSocket.isBound()) {
+	        //Get the ThreadFactory implementation to use
+	        ThreadFactory threadFactory = Executors.defaultThreadFactory();
+	        //creating the ThreadPoolExecutor
+	        ThreadPoolExecutor executorPool = new ThreadPoolExecutor(5, 50, 0, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), threadFactory);
+	        Socket client = null;
+	        LOGGER.log(Level.INFO, usage);
+	        while (serverSocket.isBound()) {
 				try { // Accept the client
-					Socket client = serverSocket.accept();
+					client = serverSocket.accept();
 					client.setSoTimeout(3000); // set timeout to 3000
-					HTTPThread clientThread = new HTTPThread(client);
-					Thread t = new Thread(clientThread);
-					t.start();
-				} catch (Exception e) { // When we catch the error, print it out
+					executorPool.execute(new HTTPThread(client));
+				}catch(RejectedExecutionException e) {
+					String serviceUnav = "Service Unavailable";
+					HTTPThread bad = new HTTPThread(client);
+					bad.returnResponse(503, serviceUnav.getBytes(), serviceUnav.length(), null);
+				}catch (Exception e) { // When we catch the error, print it out
 					String error = getStackTrace(e);
 					LOGGER.log(Level.SEVERE, error);
 				}
@@ -83,7 +96,7 @@ public class PartialHTTP1Server {
 	/**
 	 * Thread to handle each HTTP request
 	 */
-	class HTTPThread implements Runnable {
+	static class HTTPThread implements Runnable {
 		private Socket clientSocket;
 		private String reqStr;
 
@@ -451,7 +464,7 @@ public class PartialHTTP1Server {
 					pstream.write(("Content-Length: " + length + "\r\n\r\n").getBytes());
 				}
 				pstream.flush();
-				Thread.sleep(250);
+				if(status != 503) Thread.sleep(250);
 			} catch (Exception e) {
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
@@ -487,7 +500,6 @@ public class PartialHTTP1Server {
 						header.add(line.toString());
 					}
 				}
-
 				// Parse the request, we can do a switch case based on request
 				ReqObj req = parseReq(reqStr);
 				if (req != null) {
@@ -524,7 +536,7 @@ public class PartialHTTP1Server {
 	 * A request object holding the method type (GET, POST, etc.) and resource to be
 	 * read
 	 */
-	class ReqObj {
+	static class ReqObj {
 		private String httpMethod;
 		private File resource;
 		private float httpVer;
@@ -614,5 +626,6 @@ public class PartialHTTP1Server {
 			this.resource = resource;
 		}
 	}
-
+	
 }
+
