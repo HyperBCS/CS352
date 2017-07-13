@@ -462,6 +462,8 @@ public class PartialHTTP1Server {
 					pstream.write("\r\n".getBytes());
 				} else if (length != 0) {
 					pstream.write(("Content-Length: " + length + "\r\n\r\n").getBytes());
+				} else {
+					pstream.write("\r\n".getBytes());
 				}
 				pstream.flush();
 				if(status != 503) Thread.sleep(250);
