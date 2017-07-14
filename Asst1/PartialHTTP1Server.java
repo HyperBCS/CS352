@@ -469,6 +469,7 @@ public class PartialHTTP1Server {
 				}
 				pstream.flush();
 				if(status != 503) Thread.sleep(250);
+				clientSocket.close();
 			} catch (Exception e) {
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
