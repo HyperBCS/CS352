@@ -42,6 +42,10 @@ public class PartialHTTP1Server {
 		}
 	}
 
+	/**
+	 * @param throwable
+	 * Prints out the stack trace of the error that was thrown
+	 */
 	public static String getStackTrace(final Throwable throwable) {
 		final StringWriter sw = new StringWriter();
 		final PrintWriter pw = new PrintWriter(sw, true);
@@ -49,6 +53,11 @@ public class PartialHTTP1Server {
 		return sw.getBuffer().toString();
 	}
 
+	/**
+	 * Allow the server to accept the client where, in a state of rest,
+	 * the server can accept at most 5 clients at once. Otherwise, a max
+	 * of 50 clients can be accepted.
+	 */
 	public void start() {
 		if (serverSocket != null && !serverSocket.isClosed()) {
 			String usage = "HTTP 1.0 server listening on port " + port;
@@ -218,6 +227,10 @@ public class PartialHTTP1Server {
 
 		}
 
+		/**
+		 * @param input- The input string to be parsed
+		 * @return a date with correct format upon parsing
+		 */
 		private Date parseDate(String input) {
 			String inputDate = "";
 			if (input.charAt(0) == ' ') {
@@ -235,6 +248,11 @@ public class PartialHTTP1Server {
 			}
 		}
 
+		/**
+		 * @param headerParts- An array containing the parts of a header
+		 * @param req- A request object input
+		 * Set the if-modified-since parameter of header
+		 */
 		private void parseHeaderParam(String[] headerParts, ReqObj req) {
 			if (headerParts[0].equalsIgnoreCase("if-modified-since")) {
 				Date ifModified = parseDate(headerParts[1]);
@@ -245,6 +263,12 @@ public class PartialHTTP1Server {
 			}
 		}
 
+
+		/**
+		 * @param header- A list of contents of the header
+		 * @param req- A input request object
+		 * This method parses the header contents into a request object
+		 */
 		private void parseHeader(List<String> header, ReqObj req) {
 			for (String headerStr : header) {
 				if (headerStr != null && headerStr.length() > 0) {
@@ -354,6 +378,12 @@ public class PartialHTTP1Server {
 
 		}
 
+
+		/**
+		 * @param req- The request object
+		 * This method fills the request object with necessary read/write
+		 * permissions as well checking file location.
+		 */
 		private void getFileInfo(ReqObj req) {
 			if (req != null) {
 				File file = req.getResource();
@@ -361,24 +391,32 @@ public class PartialHTTP1Server {
 				if (file.exists() && !file.isDirectory()) {
 					req.setDate(new Date(file.lastModified()));
 					req.setSize(file.length());
-					if (file.canRead() && file.canWrite()) { // file is
-																// readable/writable
+					// file is readable/writable
+					if (file.canRead() && file.canWrite()) {
 						req.setPerm(2);
-					} else if (file.canRead()) {
+					} else if (file.canRead()) { //read only
 						req.setPerm(1);
 					}
-				} else {
+				} else { //write only
 					req.setPerm(0);
 				}
 			}
 		}
 
+		/**
+		 * @param date- the input date
+		 * @return the time of the server as a String
+		 */
 		private String getServerTime(Date date) {
 			SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
 			dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
 			return dateFormat.format(date);
 		}
 
+		/**
+		 * @param ext- the file extension
+		 * @return the type of MIME depending on the file extension
+		 */
 		private String getMIME(String ext) {
 			switch (ext) {
 			case "txt":
@@ -411,6 +449,11 @@ public class PartialHTTP1Server {
 			}
 		}
 
+		/**
+		 * @param obj- A request object
+		 * @param status- status code
+		 * @return header content with necessary appended information
+		 */
 		private String doHeader(ReqObj obj, int status) {
 			String date = getServerTime(new Date());
 			StringBuilder header = new StringBuilder();
@@ -631,6 +674,5 @@ public class PartialHTTP1Server {
 			this.resource = resource;
 		}
 	}
-	
-}
 
+}
