@@ -108,6 +108,7 @@ public class PartialHTTP1Server {
 	static class HTTPThread implements Runnable {
 		private Socket clientSocket;
 		private String reqStr;
+		private BufferedReader in = null;
 
 		HTTPThread(Socket c) {
 			this.clientSocket = c;
@@ -135,6 +136,9 @@ public class PartialHTTP1Server {
 
 			case 408:
 				return "HTTP/1.0 408 Request Timeout";
+				
+			case 411:
+				return "HTTP/1.0 411 Length Required";
 
 			case 500:
 				return "HTTP/1.0 500 Internal Server Error";
@@ -261,6 +265,33 @@ public class PartialHTTP1Server {
 					req.setIfModifiedDate(ifModified);
 				}
 			}
+			if (headerParts[0].equalsIgnoreCase("content-length")) {
+				long lengthHeader = -1;
+				try {
+				String headerPart = headerParts[1];
+				if (headerPart.charAt(0) == ' ') {
+					headerPart = headerPart.substring(1);
+				}
+				lengthHeader = Long.parseLong(headerPart);
+				} catch(Exception e) {
+					String error = getStackTrace(e);
+					LOGGER.log(Level.SEVERE, error);
+				}
+				if (lengthHeader >= 0) {
+					req.setLengthHeader(true);
+					req.setLengthHeaderData(lengthHeader);
+				}
+			}
+			if (headerParts[0].equalsIgnoreCase("Content-Type")) {
+				String contentType = headerParts[1];
+				if (contentType.charAt(0) == ' ') {
+					contentType = contentType.substring(1);
+				}
+				if (contentType.equalsIgnoreCase("application/x-www-form-urlencoded")) {
+					req.setTypeHeader(true);
+					req.setTypeHeaderData(headerParts[1]);
+				}
+			}
 		}
 
 
@@ -291,6 +322,7 @@ public class PartialHTTP1Server {
 			String notImpl = "Not Implemented";
 			String badReq = "Bad Request";
 			String wrongVer = "HTTP Version Not Supported";
+			// NEED TO CHANGE THIS BACK to 1.0
 			if (ver > 0 && ver <= 1.0) {
 				getFileInfo(request);
 				switch (method) {
@@ -298,7 +330,7 @@ public class PartialHTTP1Server {
 					doGet(request, false);
 					break;
 				case "POST":
-					doGet(request, false);
+					doPost(request);
 					break;
 				case "HEAD":
 					doGet(request, true);
@@ -323,6 +355,68 @@ public class PartialHTTP1Server {
 				returnResponse(505, wrongVer.getBytes(), wrongVer.length(), request);
 			}
 		}
+		
+		private String getPayload(long length) {
+			StringBuilder line = new StringBuilder();
+			try {
+			for(int i = 0; i < length;i++) {
+				char c = (char) in.read();
+				line.append(Character.toString(c));
+			}
+			return line.toString();
+		} catch (Exception e) {
+			String error = getStackTrace(e);
+			LOGGER.log(Level.SEVERE, error);
+			return null;
+		}
+		}
+		
+		private String[] parsePayload(String payload) {
+			return null;
+		}
+		
+		private void doPost(ReqObj req) {
+			if(!req.typeHeader) {
+				String noType = "Internal Server Error";
+				returnResponse(500, noType.getBytes(), noType.length(), req);
+				return;
+			} else if(!req.lengthHeader) {
+				String noLength = "Length Required";
+				returnResponse(411, noLength.getBytes(), noLength.length(), req);
+				return;
+			}
+			File file = req.getResource();
+			if(file.exists() && !file.isDirectory()) {
+				String filePath = req.getResource().toString();
+				String[] extArr = filePath.split("\\.");
+				String ext = extArr[extArr.length - 1].toLowerCase();
+				if(!ext.equalsIgnoreCase("cgi")) {
+					returnResponse(405, "Method Not Allowed".getBytes(), "Method Not Allowed".toString().length(), req);
+					return;
+				}
+				if(file.canExecute()) {
+					String payload = getPayload(req.getLengthHeaderData());
+					if(payload != null) {
+						try {
+						payload = java.net.URLDecoder.decode(payload, "UTF-8");
+						} catch(Exception e) {
+							String error = getStackTrace(e);
+							LOGGER.log(Level.SEVERE, error);
+						}
+						parsePayload(payload);
+						returnResponse(200, payload.getBytes(), payload.length(), req);
+					} else {
+						returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
+					}
+				} else {
+					returnResponse(403, "Forbidden".getBytes(), "Forbidden".toString().length(), req);
+				}
+			} else {
+				returnResponse(404, "File not found".getBytes(), "File not found".toString().length(), req);
+			}
+			
+		}
+		
 
 		/**
 		 * @param req-
@@ -423,6 +517,8 @@ public class PartialHTTP1Server {
 			case "c":
 			case "cc":
 			case "h":
+				return "text/plain";
+			case "cgi":
 				return "text/plain";
 			case "css":
 				return "text/css";
@@ -525,7 +621,6 @@ public class PartialHTTP1Server {
 		 */
 		public void run() {
 			Socket client = null;
-			BufferedReader in = null;
 			try {
 				client = clientSocket;
 				in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -545,7 +640,7 @@ public class PartialHTTP1Server {
 					if (line.toString().equals("\r\n") || line.toString().equals("\n") || c == Character.MAX_VALUE) {
 						break;
 					} else {
-						header.add(line.toString());
+						header.add(line.toString().substring(0, line.toString().length()-2));
 					}
 				}
 				// Parse the request, we can do a switch case based on request
@@ -561,11 +656,13 @@ public class PartialHTTP1Server {
 			} catch (SocketTimeoutException e) {
 				byte[] reqTimeout = "Request Timeout".getBytes();
 				returnResponse(408, reqTimeout, reqTimeout.length, null);
+				return;
 			} catch (Exception e) {
 				byte[] serverError = "Internal Server Error".getBytes();
 				returnResponse(500, serverError, serverError.length, null);
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
+				return;
 			} finally {
 				try {
 					if (client != null)
@@ -595,6 +692,43 @@ public class PartialHTTP1Server {
 		private int status = 0;
 		private boolean ifModified = false;
 		private Date ifModifiedDate;
+		private boolean lengthHeader = false;
+		private long lengthHeaderData = 0;
+		private boolean typeHeader = false;
+		private String typeHeaderData = "";
+		
+		public void setLengthHeader(boolean lengthHeader) {
+			this.lengthHeader = lengthHeader;
+		}
+		
+		public void setTypeHeader(boolean typeHeader) {
+			this.typeHeader = typeHeader;
+		}
+		
+		public void setLengthHeaderData(long lengthHeaderData) {
+			this.lengthHeaderData = lengthHeaderData;
+		}
+		
+		public void setTypeHeaderData(String typeHeaderData) {
+			this.typeHeaderData = typeHeaderData;
+		}
+		
+		public boolean getLengthHeader() {
+			return this.lengthHeader;
+		}
+		
+		public boolean getTypeHeader() {
+			return this.typeHeader;
+		}
+		
+		public long getLengthHeaderData() {
+			return this.lengthHeaderData;
+		}
+		
+		public String getTypeHeaderData() {
+			return this.typeHeaderData;
+		}
+		
 
 		ReqObj(String httpMethod, File resource, float httpVer) {
 			this.httpMethod = httpMethod;
