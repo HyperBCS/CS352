@@ -401,8 +401,8 @@ public class PartialHTTP1Server {
 				String line = null;
 				// may need to account for when nothing is printed back
 				while ((line = reader.readLine()) != null) {
-						builder.append(line);
-						builder.append(System.getProperty("line.separator"));
+					builder.append(line);
+					builder.append(System.getProperty("line.separator"));
 				}
 				return builder.toString();
 			} catch (Exception e) {
