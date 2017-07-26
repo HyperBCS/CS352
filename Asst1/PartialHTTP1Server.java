@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.Path;
 import java.util.Locale;
-import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -28,8 +27,7 @@ public class PartialHTTP1Server {
 	private static final Logger LOGGER = Logger.getLogger(PartialHTTP1Server.class.getName());
 
 	/**
-	 * Constructor to start the server and creates a new thread for each
-	 * connection
+	 * Constructor to start the server and creates a new thread for each connection
 	 */
 	PartialHTTP1Server(String[] args) {
 
@@ -46,7 +44,7 @@ public class PartialHTTP1Server {
 
 	/**
 	 * @param throwable
-	 *            Prints out the stack trace of the error that was thrown
+	 * Prints out the stack trace of the error that was thrown
 	 */
 	public static String getStackTrace(final Throwable throwable) {
 		final StringWriter sw = new StringWriter();
@@ -56,30 +54,29 @@ public class PartialHTTP1Server {
 	}
 
 	/**
-	 * Allow the server to accept the client where, in a state of rest, the
-	 * server can accept at most 5 clients at once. Otherwise, a max of 50
-	 * clients can be accepted.
+	 * Allow the server to accept the client where, in a state of rest,
+	 * the server can accept at most 5 clients at once. Otherwise, a max
+	 * of 50 clients can be accepted.
 	 */
 	public void start() {
 		if (serverSocket != null && !serverSocket.isClosed()) {
 			String usage = "HTTP 1.0 server listening on port " + port;
-			// Get the ThreadFactory implementation to use
-			ThreadFactory threadFactory = Executors.defaultThreadFactory();
-			// creating the ThreadPoolExecutor
-			ThreadPoolExecutor executorPool = new ThreadPoolExecutor(5, 50, 0, TimeUnit.SECONDS,
-					new SynchronousQueue<Runnable>(), threadFactory);
-			Socket client = null;
-			LOGGER.log(Level.INFO, usage);
-			while (serverSocket.isBound()) {
+	        //Get the ThreadFactory implementation to use
+	        ThreadFactory threadFactory = Executors.defaultThreadFactory();
+	        //creating the ThreadPoolExecutor
+	        ThreadPoolExecutor executorPool = new ThreadPoolExecutor(5, 50, 0, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), threadFactory);
+	        Socket client = null;
+	        LOGGER.log(Level.INFO, usage);
+	        while (serverSocket.isBound()) {
 				try { // Accept the client
 					client = serverSocket.accept();
 					client.setSoTimeout(3000); // set timeout to 3000
-					executorPool.execute(new HTTPThread(client, port));
-				} catch (RejectedExecutionException e) {
+					executorPool.execute(new HTTPThread(client));
+				}catch(RejectedExecutionException e) {
 					String serviceUnav = "Service Unavailable";
-					HTTPThread bad = new HTTPThread(client, port);
+					HTTPThread bad = new HTTPThread(client);
 					bad.returnResponse(503, serviceUnav.getBytes(), serviceUnav.length(), null);
-				} catch (Exception e) { // When we catch the error, print it out
+				}catch (Exception e) { // When we catch the error, print it out
 					String error = getStackTrace(e);
 					LOGGER.log(Level.SEVERE, error);
 				}
@@ -110,12 +107,9 @@ public class PartialHTTP1Server {
 	 */
 	static class HTTPThread implements Runnable {
 		private Socket clientSocket;
-		private int port;
 		private String reqStr;
-		private BufferedReader in = null;
 
-		HTTPThread(Socket c, int port) {
-			this.port = port;
+		HTTPThread(Socket c) {
 			this.clientSocket = c;
 		}
 
@@ -138,15 +132,9 @@ public class PartialHTTP1Server {
 
 			case 404:
 				return "HTTP/1.0 404 Not Found";
-				
-			case 405:
-				return "HTTP/1.0 405 Method Not Allowed";	
 
 			case 408:
 				return "HTTP/1.0 408 Request Timeout";
-
-			case 411:
-				return "HTTP/1.0 411 Length Required";
 
 			case 500:
 				return "HTTP/1.0 500 Internal Server Error";
@@ -181,9 +169,8 @@ public class PartialHTTP1Server {
 		/**
 		 * @param req-
 		 *            the request inputted by the user to be parsed
-		 * @return a ReqObj containing the method and path to resource This
-		 *         method will parse a request string and return a request
-		 *         object
+		 * @return a ReqObj containing the method and path to resource This method will
+		 *         parse a request string and return a request object
 		 **/
 		private ReqObj parseReq(String req) {
 			// Make sure request isnt null
@@ -211,8 +198,7 @@ public class PartialHTTP1Server {
 				if (verArr[0].equals("HTTP") && verArr[1].split("\\.").length == 2) {
 					try {
 						String[] verNum = verArr[1].split("\\.");
-						if (verNum[0].length() != 1 || verNum[1].length() != 1)
-							return null;
+						if(verNum[0].length() != 1 || verNum[1].length() != 1) return null;
 						ver = Float.parseFloat(verArr[1]);
 					} catch (Exception e) {
 						return null;
@@ -242,15 +228,18 @@ public class PartialHTTP1Server {
 		}
 
 		/**
-		 * @param input-
-		 *            The input string to be parsed
+		 * @param input- The input string to be parsed
 		 * @return a date with correct format upon parsing
 		 */
 		private Date parseDate(String input) {
+			String inputDate = "";
+			if (input.charAt(0) == ' ') {
+				inputDate = input.substring(1);
+			}
 			SimpleDateFormat parser = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
 			parser.setTimeZone(TimeZone.getTimeZone("GMT"));
 			try {
-				return parser.parse(input);
+				return parser.parse(inputDate);
 
 			} catch (ParseException e) {
 				String error = getStackTrace(e);
@@ -260,56 +249,25 @@ public class PartialHTTP1Server {
 		}
 
 		/**
-		 * @param headerParts-
-		 *            An array containing the parts of a header
-		 * @param req-
-		 *            A request object input Set the if-modified-since parameter
-		 *            of header
+		 * @param headerParts- An array containing the parts of a header
+		 * @param req- A request object input
+		 * Set the if-modified-since parameter of header
 		 */
 		private void parseHeaderParam(String[] headerParts, ReqObj req) {
-			String headerData = headerParts[1];
-			if (headerData.charAt(0) == ' ') {
-				headerData = headerData.substring(1);
-			}
 			if (headerParts[0].equalsIgnoreCase("if-modified-since")) {
-				Date ifModified = parseDate(headerData);
+				Date ifModified = parseDate(headerParts[1]);
 				if (ifModified != null) {
-					req.ifModified = true;
-					req.ifModifiedDate = ifModified;
+					req.setIfModified(true);
+					req.setIfModifiedDate(ifModified);
 				}
-			}
-			if (headerParts[0].equalsIgnoreCase("content-length")) {
-				long lengthHeader = -1;
-				try {
-					lengthHeader = Long.parseLong(headerData);
-				} catch (Exception e) {
-					String error = getStackTrace(e);
-					LOGGER.log(Level.SEVERE, error);
-				}
-				if (lengthHeader >= 0) {
-					req.lengthHeader = true;
-					req.lengthHeaderData = lengthHeader;
-				}
-			}
-			if (headerParts[0].equalsIgnoreCase("Content-Type")) {
-				if (headerData.equalsIgnoreCase("application/x-www-form-urlencoded")) {
-					req.typeHeader = true;
-				}
-			}
-			if (headerParts[0].equalsIgnoreCase("From")) {
-				req.fromField = headerData;
-			}
-			if (headerParts[0].equalsIgnoreCase("User-Agent")) {
-				req.userAgnet = headerData;
 			}
 		}
 
+
 		/**
-		 * @param header-
-		 *            A list of contents of the header
-		 * @param req-
-		 *            A input request object This method parses the header
-		 *            contents into a request object
+		 * @param header- A list of contents of the header
+		 * @param req- A input request object
+		 * This method parses the header contents into a request object
 		 */
 		private void parseHeader(List<String> header, ReqObj req) {
 			for (String headerStr : header) {
@@ -324,17 +282,15 @@ public class PartialHTTP1Server {
 
 		/**
 		 * @param request-
-		 *            a ReqObj containing method and path filled in by parseReq
-		 *            this method will perform the requested method, though only
-		 *            GET works.
+		 *            a ReqObj containing method and path filled in by parseReq this
+		 *            method will perform the requested method, though only GET works.
 		 */
 		public void doMethod(ReqObj request) {
-			String method = request.httpMethod; // store method
-			float ver = request.httpVer;
+			String method = request.getMethod(); // store method
+			float ver = request.getVer();
 			String notImpl = "Not Implemented";
 			String badReq = "Bad Request";
 			String wrongVer = "HTTP Version Not Supported";
-			// NEED TO CHANGE THIS BACK to 1.0
 			if (ver > 0 && ver <= 1.0) {
 				getFileInfo(request);
 				switch (method) {
@@ -368,146 +324,37 @@ public class PartialHTTP1Server {
 			}
 		}
 
-		private String getPayload(long length) {
-			StringBuilder line = new StringBuilder();
-			try {
-				for (int i = 0; i < length; i++) {
-					char c = (char) in.read();
-					line.append(Character.toString(c));
-				}
-				return line.toString();
-			} catch (Exception e) {
-				String error = getStackTrace(e);
-				LOGGER.log(Level.SEVERE, error);
-				return null;
-			}
-		}
-
-		private boolean sendInput(Process p, String payload) {
-			try (OutputStream stdin = p.getOutputStream();
-					BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));) {
-				writer.write(payload);
-				writer.flush();
-				return true;
-			} catch (Exception e) {
-				String error = getStackTrace(e);
-				LOGGER.log(Level.SEVERE, error);
-				return false;
-			}
-		}
-
-		private String getOutput(Process p) {
-			try(
-			BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));){
-			StringBuilder builder = new StringBuilder();
-			String line = null;
-			// may need to account for when nothing is printed back
-			while ((line = reader.readLine()) != null) {
-				builder.append(line);
-				builder.append(System.getProperty("line.separator"));
-			}
-			return builder.toString();
-			} catch(Exception e){
-				String error = getStackTrace(e);
-				LOGGER.log(Level.SEVERE, error);
-				return null;
-			}
-		}
-
-		private void doPost(ReqObj req) {
-			if (!req.typeHeader) {
-				String noType = "Internal Server Error";
-				returnResponse(500, noType.getBytes(), noType.length(), req);
-				return;
-			} else if (!req.lengthHeader) {
-				String noLength = "Length Required";
-				returnResponse(411, noLength.getBytes(), noLength.length(), req);
-				return;
-			}
-			File file = req.resource;
-			if (file.exists() && !file.isDirectory()) {
-				String filePath = req.resource.toString();
-				String[] extArr = filePath.split("\\.");
-				String ext = extArr[extArr.length - 1].toLowerCase();
-				if (!ext.equalsIgnoreCase("cgi")) {
-					returnResponse(405, "Method Not Allowed".getBytes(), "Method Not Allowed".toString().length(), req);
-					return;
-				}
-				if (file.canExecute()) {
-					String payload = getPayload(req.lengthHeaderData);
-					if (payload != null) {
-						byte[] stdout = null;
-						long length = 0;
-						try {
-							payload = java.net.URLDecoder.decode(payload, "UTF-8");
-							String hostIP = Inet4Address.getLocalHost().getHostAddress();
-							ProcessBuilder pb = new ProcessBuilder(filePath, payload);
-							Map<String, String> env = pb.environment();
-							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
-							env.put("SCRIPT_NAME", filePath);
-							env.put("SERVER_NAME", hostIP);
-							env.put("SERVER_PORT", String.valueOf(port));
-							if(req.fromField != null)
-								env.put("HTTP_FROM", req.fromField);
-							if(req.userAgnet != null)
-								env.put("HTTP_USER_AGENT", req.userAgnet);
-							Process p = pb.start();
-							sendInput(p, payload);
-							String output = getOutput(p);
-							if(output != null){
-								stdout = output.getBytes();
-								length = output.length();
-							}
-						} catch (Exception e) {
-							String error = getStackTrace(e);
-							LOGGER.log(Level.SEVERE, error);
-							returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
-						}
-						returnResponse(200, stdout, length, req);
-					} else {
-						returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
-					}
-				} else {
-					returnResponse(403, "Forbidden".getBytes(), "Forbidden".toString().length(), req);
-				}
-			} else {
-				returnResponse(404, "File not found".getBytes(), "File not found".toString().length(), req);
-			}
-
-		}
-
 		/**
 		 * @param req-
-		 *            the GET request This method will perform get a resource
-		 *            defined in the ReqObj. Then it will call return response
-		 *            with the correct status and content. If there is an error
-		 *            in fetching the resource give null content, and the
-		 *            correct code.
+		 *            the GET request This method will perform get a resource defined in
+		 *            the ReqObj. Then it will call return response with the correct
+		 *            status and content. If there is an error in fetching the resource
+		 *            give null content, and the correct code.
 		 **/
 		private void doGet(ReqObj req, boolean head) {
-			File file = req.resource;
+			File file = req.getResource();
 			byte[] contents = "".getBytes();
 			// file must not be a directory and has to exist
 			if (file.exists() && !file.isDirectory()) {
 				if (req.ifModified) {
-					long lastModified = req.date.getTime();
+					long lastModified = req.getDate().getTime();
 					long ifModified = req.ifModifiedDate.getTime();
 					if (lastModified < ifModified) {
-						req.status = 304;
+						req.setStatus(304);
 					}
 				}
-				if (req.status != 304) {
+				if (req.getStatus() != 304) {
 					if (file.canRead()) { // file is readable
 						try { // read and return contents of file
 							Path path = Paths.get(file.toString());
 							contents = Files.readAllBytes(path);
-							req.status = 200;
+							req.setStatus(200);
 						} catch (AccessDeniedException e) {
 							String notReadable = "Forbidden";
 							contents = notReadable.getBytes();
-							req.status = 403;
+							req.setStatus(403);
 						} catch (Exception e) {
-							req.status = 500;
+							req.setStatus(500);
 							contents = "Internal Server Error".getBytes();
 							String error = getStackTrace(e);
 							LOGGER.log(Level.SEVERE, error);
@@ -515,41 +362,49 @@ public class PartialHTTP1Server {
 					} else {
 						String notReadable = "Forbidden";
 						contents = notReadable.getBytes();
-						req.status = 403;
+						req.setStatus(403);
 					}
 				}
 			} else {
 				String fourOFour = "File not found";
 				contents = fourOFour.getBytes();
-				req.status = 404;
+				req.setStatus(404);
 			}
-			if (!head && req.status != 304) {
-				returnResponse(req.status, contents, contents.length, req);
+			if (!head && req.getStatus() != 304) {
+				returnResponse(req.getStatus(), contents, contents.length, req);
 			} else {
-				returnResponse(req.status, null, contents.length, req);
+				returnResponse(req.getStatus(), null, contents.length, req);
 			}
 
 		}
 
+
 		/**
-		 * @param req-
-		 *            The request object This method fills the request object
-		 *            with necessary read/write permissions as well checking
-		 *            file location.
+		 * @param req- The request object
+		 * This method fills the request object with necessary read/write
+		 * permissions as well checking file location.
 		 */
 		private void getFileInfo(ReqObj req) {
 			if (req != null) {
-				File file = req.resource;
+				File file = req.getResource();
 				// file must not be a directory and has to exist
 				if (file.exists() && !file.isDirectory()) {
-					req.date = (new Date(file.lastModified()));
+					req.setDate(new Date(file.lastModified()));
+					req.setSize(file.length());
+					// file is readable/writable
+					if (file.canRead() && file.canWrite()) {
+						req.setPerm(2);
+					} else if (file.canRead()) { //read only
+						req.setPerm(1);
+					}
+				} else { //write only
+					req.setPerm(0);
 				}
 			}
 		}
 
 		/**
-		 * @param date-
-		 *            the input date
+		 * @param date- the input date
 		 * @return the time of the server as a String
 		 */
 		private String getServerTime(Date date) {
@@ -559,8 +414,7 @@ public class PartialHTTP1Server {
 		}
 
 		/**
-		 * @param ext-
-		 *            the file extension
+		 * @param ext- the file extension
 		 * @return the type of MIME depending on the file extension
 		 */
 		private String getMIME(String ext) {
@@ -572,7 +426,6 @@ public class PartialHTTP1Server {
 				return "text/plain";
 			case "css":
 				return "text/css";
-			case "cgi":
 			case "html":
 			case "htm":
 				return "text/html";
@@ -597,10 +450,8 @@ public class PartialHTTP1Server {
 		}
 
 		/**
-		 * @param obj-
-		 *            A request object
-		 * @param status-
-		 *            status code
+		 * @param obj- A request object
+		 * @param status- status code
 		 * @return header content with necessary appended information
 		 */
 		private String doHeader(ReqObj obj, int status) {
@@ -609,7 +460,7 @@ public class PartialHTTP1Server {
 			String[] extArr = null;
 			String ext = "";
 			if (obj != null) {
-				String filePath = obj.resource.toString();
+				String filePath = obj.getResource().toString();
 				extArr = filePath.split("\\.");
 				ext = extArr[extArr.length - 1].toLowerCase();
 			}
@@ -623,7 +474,7 @@ public class PartialHTTP1Server {
 				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
 				header.append("Expires: " + getServerTime(nowYear));
 				header.append("\r\n");
-				header.append("Last-Modified: " + getServerTime(obj.date));
+				header.append("Last-Modified: " + getServerTime(obj.getDate()));
 				header.append("\r\n");
 				header.append("Content-Type: " + getMIME(ext));
 				header.append("\r\n");
@@ -640,9 +491,8 @@ public class PartialHTTP1Server {
 		 * @param status-
 		 *            the status code to be returned
 		 * @param content-
-		 *            a byte array containing the contents of what needs to get
-		 *            to client Print request and other info pertianing to the
-		 *            Client
+		 *            a byte array containing the contents of what needs to get to
+		 *            client Print request and other info pertianing to the Client
 		 **/
 		private void returnResponse(int status, byte[] content, long length, ReqObj request) {
 			String log = logBuilder(status);
@@ -661,8 +511,7 @@ public class PartialHTTP1Server {
 					pstream.write("\r\n".getBytes());
 				}
 				pstream.flush();
-				if (status != 503)
-					Thread.sleep(250);
+				if(status != 503) Thread.sleep(250);
 				clientSocket.close();
 			} catch (Exception e) {
 				String error = getStackTrace(e);
@@ -672,11 +521,11 @@ public class PartialHTTP1Server {
 
 		@Override
 		/**
-		 * perform the client request if appropriate and within the alloted time
-		 * of 3s
+		 * perform the client request if appropriate and within the alloted time of 3s
 		 */
 		public void run() {
 			Socket client = null;
+			BufferedReader in = null;
 			try {
 				client = clientSocket;
 				in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -696,7 +545,7 @@ public class PartialHTTP1Server {
 					if (line.toString().equals("\r\n") || line.toString().equals("\n") || c == Character.MAX_VALUE) {
 						break;
 					} else {
-						header.add(line.toString().substring(0, line.toString().length() - 2));
+						header.add(line.toString());
 					}
 				}
 				// Parse the request, we can do a switch case based on request
@@ -712,13 +561,11 @@ public class PartialHTTP1Server {
 			} catch (SocketTimeoutException e) {
 				byte[] reqTimeout = "Request Timeout".getBytes();
 				returnResponse(408, reqTimeout, reqTimeout.length, null);
-				return;
 			} catch (Exception e) {
 				byte[] serverError = "Internal Server Error".getBytes();
 				returnResponse(500, serverError, serverError.length, null);
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
-				return;
 			} finally {
 				try {
 					if (client != null)
@@ -734,23 +581,20 @@ public class PartialHTTP1Server {
 	}
 
 	/*
-	 * A request object holding the method type (GET, POST, etc.) and resource
-	 * to be read
+	 * A request object holding the method type (GET, POST, etc.) and resource to be
+	 * read
 	 */
 	static class ReqObj {
 		private String httpMethod;
 		private File resource;
 		private float httpVer;
+		private long fileSize = 0;
 		// perm: 0=doesnt exist, 1=read/no write, 2=read/write
+		private int perm = 0;
+		private Date modified;
 		private int status = 0;
 		private boolean ifModified = false;
 		private Date ifModifiedDate;
-		private Date date;
-		private boolean lengthHeader = false;
-		private long lengthHeaderData = 0;
-		private boolean typeHeader = false;
-		private String fromField = null;
-		private String userAgnet = null;
 
 		ReqObj(String httpMethod, File resource, float httpVer) {
 			this.httpMethod = httpMethod;
@@ -758,6 +602,77 @@ public class PartialHTTP1Server {
 			this.httpVer = httpVer;
 		}
 
+		public boolean getIfModified() {
+			return ifModified;
+		}
+
+		public void setIfModified(boolean ifModified) {
+			this.ifModified = ifModified;
+		}
+
+		public Date getIfModifiedDate() {
+			return this.ifModifiedDate;
+		}
+
+		public void setIfModifiedDate(Date ifModifiedDate) {
+			this.ifModifiedDate = ifModifiedDate;
+		}
+
+		public int getStatus() {
+			return this.status;
+		}
+
+		public void setStatus(int status) {
+			this.status = status;
+		}
+
+		public Date getDate() {
+			return this.modified;
+		}
+
+		public void setDate(Date modified) {
+			this.modified = modified;
+		}
+
+		public long getSize() {
+			return this.fileSize;
+		}
+
+		public void setSize(long size) {
+			this.fileSize = size;
+		}
+
+		public void setPerm(int perm) {
+			this.perm = perm;
+		}
+
+		public int getPerm() {
+			return this.perm;
+		}
+
+		public float getVer() {
+			return this.httpVer;
+		}
+
+		public void setVer(float httpVer) {
+			this.httpVer = httpVer;
+		}
+
+		public String getMethod() {
+			return this.httpMethod;
+		}
+
+		public void setMethod(String httpMethod) {
+			this.httpMethod = httpMethod;
+		}
+
+		public File getResource() {
+			return this.resource;
+		}
+
+		public void setResource(File resource) {
+			this.resource = resource;
+		}
 	}
 
 }

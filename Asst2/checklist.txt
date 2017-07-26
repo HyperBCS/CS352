@@ -1,0 +1,5 @@
+return and check for http/1.0
+support GET POST HEAD
+create header
+get new lines and parse
+restore timeout
