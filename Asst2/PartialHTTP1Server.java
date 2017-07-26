@@ -404,13 +404,13 @@ public class PartialHTTP1Server {
 				String line = null;
 				// may need to account for when nothing is printed back
 				while ((line = reader.readLine()) != null) {
-					if(builder.length() == 0){
+					if (builder.length() == 0) {
 						builder.append(line);
-					} else{
+					} else {
 						builder.append(System.getProperty("line.separator"));
 						builder.append(line);
 					}
-					
+
 				}
 				return builder.toString();
 			} catch (Exception e) {
