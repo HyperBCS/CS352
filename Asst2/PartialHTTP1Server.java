@@ -127,6 +127,9 @@ public class PartialHTTP1Server {
 			case 200:
 				return "HTTP/1.0 200 OK";
 
+			case 204:
+				return "HTTP/1.0 204 No Content";
+
 			case 304:
 				return "HTTP/1.0 304 Not Modified";
 
@@ -401,8 +404,13 @@ public class PartialHTTP1Server {
 				String line = null;
 				// may need to account for when nothing is printed back
 				while ((line = reader.readLine()) != null) {
-					builder.append(line);
-					builder.append(System.getProperty("line.separator"));
+					if(builder.length() == 0){
+						builder.append(line);
+					} else{
+						builder.append(System.getProperty("line.separator"));
+						builder.append(line);
+					}
+					
 				}
 				return builder.toString();
 			} catch (Exception e) {
@@ -453,7 +461,10 @@ public class PartialHTTP1Server {
 							Process p = pb.start();
 							sendInput(p, payload);
 							String output = getOutput(p);
-							if (output != null) {
+							if (output != null && output.length() == 0) {
+								req.status = 204;
+							} else if (output != null) {
+								req.status = 200;
 								stdout = output.getBytes();
 								length = output.length();
 							}
@@ -464,7 +475,7 @@ public class PartialHTTP1Server {
 									req);
 							return;
 						}
-						returnResponse(200, stdout, length, req);
+						returnResponse(req.status, stdout, length, req);
 					} else {
 						returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
 					}
@@ -620,14 +631,18 @@ public class PartialHTTP1Server {
 			header.append("\r\n");
 			header.append("Content-Encoding: identity");
 			header.append("\r\n");
-			if (obj != null && (status == 200 || status == 304)) {
+			if (obj != null && (status == 200 || status == 304 || status == 204)) {
 				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
-				header.append("Expires: " + getServerTime(nowYear));
-				header.append("\r\n");
-				header.append("Last-Modified: " + getServerTime(obj.date));
-				header.append("\r\n");
-				header.append("Content-Type: " + getMIME(ext));
-				header.append("\r\n");
+				if (!obj.httpMethod.equalsIgnoreCase("post")) {
+					header.append("Expires: " + getServerTime(nowYear));
+					header.append("\r\n");
+					header.append("Last-Modified: " + getServerTime(obj.date));
+					header.append("\r\n");
+				}
+				if (status != 204) {
+					header.append("Content-Type: " + getMIME(ext));
+					header.append("\r\n");
+				}
 			} else {
 				// Content length for 404?
 				header.append("Content-Type: " + getMIME("txt"));
