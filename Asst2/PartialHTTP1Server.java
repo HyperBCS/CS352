@@ -231,7 +231,7 @@ public class PartialHTTP1Server {
 					String workingDir = System.getProperty("user.dir");
 					File dir = new File(workingDir);
 					File fullPath = new File(dir, relativePath);
-					return new ReqObj(method, fullPath, ver);
+					return new ReqObj(method, fullPath, ver, relativePath);
 				} catch (Exception e) {
 					String error = getStackTrace(e);
 					LOGGER.log(Level.SEVERE, error);
@@ -421,13 +421,13 @@ public class PartialHTTP1Server {
 		}
 
 		private void doPost(ReqObj req) {
-			if (!req.typeHeader) {
-				String noType = "Internal Server Error";
-				returnResponse(500, noType.getBytes(), noType.length(), req);
-				return;
-			} else if (!req.lengthHeader) {
+			if (!req.lengthHeader) {
 				String noLength = "Length Required";
 				returnResponse(411, noLength.getBytes(), noLength.length(), req);
+				return;
+			} else if (!req.typeHeader) {
+				String noType = "Internal Server Error";
+				returnResponse(500, noType.getBytes(), noType.length(), req);
 				return;
 			}
 			File file = req.resource;
@@ -451,7 +451,7 @@ public class PartialHTTP1Server {
 							pb.redirectErrorStream(true);
 							Map<String, String> env = pb.environment();
 							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
-							env.put("SCRIPT_NAME", filePath);
+							env.put("SCRIPT_NAME", req.relativePath);
 							env.put("SERVER_NAME", hostIP);
 							env.put("SERVER_PORT", String.valueOf(port));
 							if (req.fromField != null)
@@ -638,8 +638,9 @@ public class PartialHTTP1Server {
 					header.append("\r\n");
 					header.append("Last-Modified: " + getServerTime(obj.date));
 					header.append("\r\n");
-				}
-				if (status != 204) {
+				} else if (status != 204 || obj.httpMethod.equalsIgnoreCase("post")) {
+					header.append("Expires: " + getServerTime(nowYear));
+					header.append("\r\n");
 					header.append("Content-Type: " + getMIME(ext));
 					header.append("\r\n");
 				}
@@ -756,6 +757,7 @@ public class PartialHTTP1Server {
 	static class ReqObj {
 		private String httpMethod;
 		private File resource;
+		private String relativePath;
 		private float httpVer;
 		// perm: 0=doesnt exist, 1=read/no write, 2=read/write
 		private int status = 0;
@@ -768,7 +770,8 @@ public class PartialHTTP1Server {
 		private String fromField = null;
 		private String userAgnet = null;
 
-		ReqObj(String httpMethod, File resource, float httpVer) {
+		ReqObj(String httpMethod, File resource, float httpVer, String relativePath) {
+			this.relativePath = relativePath;
 			this.httpMethod = httpMethod;
 			this.resource = resource;
 			this.httpVer = httpVer;
