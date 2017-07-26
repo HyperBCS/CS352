@@ -138,9 +138,9 @@ public class PartialHTTP1Server {
 
 			case 404:
 				return "HTTP/1.0 404 Not Found";
-				
+
 			case 405:
-				return "HTTP/1.0 405 Method Not Allowed";	
+				return "HTTP/1.0 405 Method Not Allowed";
 
 			case 408:
 				return "HTTP/1.0 408 Request Timeout";
@@ -291,10 +291,9 @@ public class PartialHTTP1Server {
 					req.lengthHeaderData = lengthHeader;
 				}
 			}
-			if (headerParts[0].equalsIgnoreCase("Content-Type")) {
-				if (headerData.equalsIgnoreCase("application/x-www-form-urlencoded")) {
-					req.typeHeader = true;
-				}
+			if (headerParts[0].equalsIgnoreCase("Content-Type")
+					&& headerData.equalsIgnoreCase("application/x-www-form-urlencoded")) {
+				req.typeHeader = true;
 			}
 			if (headerParts[0].equalsIgnoreCase("From")) {
 				req.fromField = headerData;
@@ -342,7 +341,7 @@ public class PartialHTTP1Server {
 					doGet(request, false);
 					break;
 				case "POST":
-					doGet(request, false);
+					doPost(request);
 					break;
 				case "HEAD":
 					doGet(request, true);
@@ -397,17 +396,16 @@ public class PartialHTTP1Server {
 		}
 
 		private String getOutput(Process p) {
-			try(
-			BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));){
-			StringBuilder builder = new StringBuilder();
-			String line = null;
-			// may need to account for when nothing is printed back
-			while ((line = reader.readLine()) != null) {
-				builder.append(line);
-				builder.append(System.getProperty("line.separator"));
-			}
-			return builder.toString();
-			} catch(Exception e){
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));) {
+				StringBuilder builder = new StringBuilder();
+				String line = null;
+				// may need to account for when nothing is printed back
+				while ((line = reader.readLine()) != null) {
+						builder.append(line);
+						builder.append(System.getProperty("line.separator"));
+				}
+				return builder.toString();
+			} catch (Exception e) {
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
 				return null;
@@ -430,7 +428,7 @@ public class PartialHTTP1Server {
 				String[] extArr = filePath.split("\\.");
 				String ext = extArr[extArr.length - 1].toLowerCase();
 				if (!ext.equalsIgnoreCase("cgi")) {
-					returnResponse(405, "Method Not Allowed".getBytes(), "Method Not Allowed".toString().length(), req);
+					returnResponse(405, "Method Not Allowed".getBytes(), "Method Not Allowed".length(), req);
 					return;
 				}
 				if (file.canExecute()) {
@@ -442,36 +440,39 @@ public class PartialHTTP1Server {
 							payload = java.net.URLDecoder.decode(payload, "UTF-8");
 							String hostIP = Inet4Address.getLocalHost().getHostAddress();
 							ProcessBuilder pb = new ProcessBuilder(filePath, payload);
+							pb.redirectErrorStream(true);
 							Map<String, String> env = pb.environment();
 							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
 							env.put("SCRIPT_NAME", filePath);
 							env.put("SERVER_NAME", hostIP);
 							env.put("SERVER_PORT", String.valueOf(port));
-							if(req.fromField != null)
+							if (req.fromField != null)
 								env.put("HTTP_FROM", req.fromField);
-							if(req.userAgnet != null)
+							if (req.userAgnet != null)
 								env.put("HTTP_USER_AGENT", req.userAgnet);
 							Process p = pb.start();
 							sendInput(p, payload);
 							String output = getOutput(p);
-							if(output != null){
+							if (output != null) {
 								stdout = output.getBytes();
 								length = output.length();
 							}
 						} catch (Exception e) {
 							String error = getStackTrace(e);
 							LOGGER.log(Level.SEVERE, error);
-							returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
+							returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(),
+									req);
+							return;
 						}
 						returnResponse(200, stdout, length, req);
 					} else {
 						returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
 					}
 				} else {
-					returnResponse(403, "Forbidden".getBytes(), "Forbidden".toString().length(), req);
+					returnResponse(403, "Forbidden".getBytes(), "Forbidden".length(), req);
 				}
 			} else {
-				returnResponse(404, "File not found".getBytes(), "File not found".toString().length(), req);
+				returnResponse(404, "File not found".getBytes(), "File not found".length(), req);
 			}
 
 		}
