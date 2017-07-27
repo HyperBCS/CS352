@@ -584,7 +584,6 @@ public class PartialHTTP1Server {
 				return "text/plain";
 			case "css":
 				return "text/css";
-			case "cgi":
 			case "html":
 			case "htm":
 				return "text/html";
@@ -638,10 +637,12 @@ public class PartialHTTP1Server {
 					header.append("\r\n");
 					header.append("Last-Modified: " + getServerTime(obj.date));
 					header.append("\r\n");
+					header.append("Content-Type: " + getMIME(ext));
+					header.append("\r\n");
 				} else if (status != 204 || obj.httpMethod.equalsIgnoreCase("post")) {
 					header.append("Expires: " + getServerTime(nowYear));
 					header.append("\r\n");
-					header.append("Content-Type: " + getMIME(ext));
+					header.append("Content-Type: text/html");
 					header.append("\r\n");
 				}
 			} else {
