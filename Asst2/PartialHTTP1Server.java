@@ -370,6 +370,10 @@ public class PartialHTTP1Server {
 			}
 		}
 
+		/**
+		 * @param length
+		 * Decode the paylaod as per RFC-3986
+		 */
 		private String getPayload(long length) {
 			StringBuilder line = new StringBuilder();
 			try {
@@ -385,9 +389,14 @@ public class PartialHTTP1Server {
 			}
 		}
 
+		/**
+		 * @param Process p
+		 * @param payload
+		 * This method will the send the payload to tge CGI script via standard in
+		 */
 		private boolean sendInput(Process p, String payload) {
 			try (OutputStream stdin = p.getOutputStream();
-					BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));) {
+					 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));) {
 				writer.write(payload);
 				writer.flush();
 				return true;
@@ -398,6 +407,10 @@ public class PartialHTTP1Server {
 			}
 		}
 
+		/**
+		 * @param Process p
+		 * Recieve the output of the execution of a CGI file
+		 */
 		private String getOutput(Process p) {
 			try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));) {
 				StringBuilder builder = new StringBuilder();
@@ -407,7 +420,7 @@ public class PartialHTTP1Server {
 					if (builder.length() == 0) {
 						builder.append(line);
 					} else {
-						builder.append(System.getProperty("line.separator"));
+						builder.append(System.getProperty("line.separator")); //OS-dependent line separator
 						builder.append(line);
 					}
 
@@ -420,6 +433,13 @@ public class PartialHTTP1Server {
 			}
 		}
 
+		/**
+		 * @param req- THe request Object
+		 * This method will perform a POST request as defined in
+		 * the request object. It will correctly parse the resource
+		 * and properly execute the CGI file. Appropriate responses
+		 * are returned depending on the error type (if any).
+		 */
 		private void doPost(ReqObj req) {
 			if (!req.lengthHeader) {
 				String noLength = "Length Required";
@@ -439,7 +459,7 @@ public class PartialHTTP1Server {
 					returnResponse(405, "Method Not Allowed".getBytes(), "Method Not Allowed".length(), req);
 					return;
 				}
-				if (file.canExecute()) {
+				if (file.canExecute()) { //execute cgi file
 					String payload = getPayload(req.lengthHeaderData);
 					if (payload != null) {
 						byte[] stdout = null;
@@ -485,7 +505,6 @@ public class PartialHTTP1Server {
 			} else {
 				returnResponse(404, "File not found".getBytes(), "File not found".length(), req);
 			}
-
 		}
 
 		/**
