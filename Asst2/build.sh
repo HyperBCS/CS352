@@ -1,1 +1,1 @@
-javac -cp . PartialHTTP1Server.java
+javac -cp . HTTP1Server.java

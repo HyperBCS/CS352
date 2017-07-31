@@ -21,17 +21,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class PartialHTTP1Server {
+public class HTTP1Server {
 
 	private ServerSocket serverSocket; // the main socket for the server
 	private int port; // which port it exists on gotten from command line
-	private static final Logger LOGGER = Logger.getLogger(PartialHTTP1Server.class.getName());
+	private static final Logger LOGGER = Logger.getLogger(HTTP1Server.class.getName());
 
 	/**
 	 * Constructor to start the server and creates a new thread for each
 	 * connection
 	 */
-	PartialHTTP1Server(String[] args) {
+	HTTP1Server(String[] args) {
 
 		// Initialize a serverSocket to accept clients
 		try {
@@ -95,12 +95,12 @@ public class PartialHTTP1Server {
 		// Check that our arguments are correct. If not we print message and
 		// exit.
 		if (args.length != 1) {
-			LOGGER.log(Level.INFO, "Usage: java -cp . PartialHTTP1Server 3456");
+			LOGGER.log(Level.INFO, "Usage: java -cp . HTTP1Server 3456");
 			return;
 		}
 		System.setProperty("java.util.logging.SimpleFormatter.format",
 				"[%1$tm/%1$td/%1$tY %1$tH:%1$tM:%1$tS] %5$s%6$s%n");
-		PartialHTTP1Server server = new PartialHTTP1Server(args);
+		HTTP1Server server = new HTTP1Server(args);
 		server.start();
 		return;
 	}
