@@ -520,7 +520,7 @@ public class PartialHTTP1Server {
 			byte[] contents = "".getBytes();
 			// file must not be a directory and has to exist
 			if (file.exists() && !file.isDirectory()) {
-				if (req.ifModified) {
+				if (req.ifModified && !head) {
 					long lastModified = req.date.getTime();
 					long ifModified = req.ifModifiedDate.getTime();
 					if (lastModified < ifModified) {
