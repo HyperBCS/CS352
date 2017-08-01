@@ -304,6 +304,11 @@ public class HTTP1ServerASP {
 			if (headerParts[0].equalsIgnoreCase("User-Agent")) {
 				req.userAgnet = headerData;
 			}
+			if (headerParts[0].equalsIgnoreCase("Cookie")) {
+				if(headerData.split("=").length > 1){
+					req.cookieStr = headerData;
+				}
+			}
 		}
 
 		/**
@@ -406,24 +411,46 @@ public class HTTP1ServerASP {
 				return false;
 			}
 		}
+		
+		String parseCookie(String pc){
+			String[] split = pc.split("Set-Cookie:");
+			if(split.length > 1){
+				return pc;
+			} else{
+				return null;
+			}
+		}
 
 		/**
 		 * @param Process p
 		 * Recieve the output of the execution of a CGI file
 		 */
-		private String getOutput(Process p) {
+		private String getOutput(Process p, ReqObj req) {
 			try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));) {
 				StringBuilder builder = new StringBuilder();
+				StringBuilder cookieResp = new StringBuilder();
 				String line = null;
 				// may need to account for when nothing is printed back
 				while ((line = reader.readLine()) != null) {
 					if (builder.length() == 0) {
-						builder.append(line);
+						if(parseCookie(line) != null){
+							cookieResp.append(line + "\r\n");
+						} else{
+							builder.append(line);
+						}
 					} else {
-						builder.append(System.getProperty("line.separator")); //OS-dependent line separator
-						builder.append(line);
+						if(parseCookie(line) != null){
+							cookieResp.append(line + "\r\n");
+						} else{
+							builder.append(System.getProperty("line.separator")); //OS-dependent line separator
+							builder.append(line);
+						}
+
 					}
 
+				}
+				if(cookieResp.length() > 0){
+					req.cookieResp = cookieResp.toString();
 				}
 				return builder.toString();
 			} catch (Exception e) {
@@ -473,14 +500,18 @@ public class HTTP1ServerASP {
 							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
 							env.put("SCRIPT_NAME", req.relativePath);
 							env.put("SERVER_NAME", hostIP);
+							env.put("REQUEST_METHOD", req.httpMethod);
 							env.put("SERVER_PORT", String.valueOf(port));
 							if (req.fromField != null)
 								env.put("HTTP_FROM", req.fromField);
 							if (req.userAgnet != null)
 								env.put("HTTP_USER_AGENT", req.userAgnet);
+							if(req.cookieStr != null){
+								env.put("HTTP_COOKIE", req.cookieStr);
+							}
 							Process p = pb.start();
 							sendInput(p, payload);
-							String output = getOutput(p);
+							String output = getOutput(p, req);
 							if (output != null && output.length() == 0) {
 								req.status = 204;
 							} else if (output != null) {
@@ -506,6 +537,57 @@ public class HTTP1ServerASP {
 				returnResponse(404, "File not found".getBytes(), "File not found".length(), req);
 			}
 		}
+		
+		private void doCGI(ReqObj req) {
+				File file = req.resource;
+				String filePath = req.resource.toString();
+				if (file.canExecute()) { //execute cgi file
+					String payload = getPayload(req.lengthHeaderData);
+					if (payload != null) {
+						byte[] stdout = null;
+						long length = 0;
+						try {
+							payload = java.net.URLDecoder.decode(payload, "UTF-8");
+							String hostIP = Inet4Address.getLocalHost().getHostAddress();
+							ProcessBuilder pb = new ProcessBuilder(filePath, payload);
+							pb.redirectErrorStream(true);
+							Map<String, String> env = pb.environment();
+							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
+							env.put("SCRIPT_NAME", req.relativePath);
+							env.put("SERVER_NAME", hostIP);
+							env.put("SERVER_PORT", String.valueOf(port));
+							env.put("REQUEST_METHOD", req.httpMethod);
+							if (req.fromField != null)
+								env.put("HTTP_FROM", req.fromField);
+							if (req.userAgnet != null)
+								env.put("HTTP_USER_AGENT", req.userAgnet);
+							if(req.cookieStr != null){
+								env.put("HTTP_COOKIE", req.cookieStr);
+							}
+							Process p = pb.start();
+							String output = getOutput(p, req);
+							if (output != null && output.length() == 0) {
+								req.status = 204;
+							} else if (output != null) {
+								req.status = 200;
+								stdout = output.getBytes();
+								length = output.length();
+							}
+						} catch (Exception e) {
+							String error = getStackTrace(e);
+							LOGGER.log(Level.SEVERE, error);
+							returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(),
+									req);
+							return;
+						}
+						returnResponse(req.status, stdout, length, req);
+					} else {
+						returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
+					}
+				} else {
+					returnResponse(403, "Forbidden".getBytes(), "Forbidden".length(), req);
+				}
+		}
 
 		/**
 		 * @param req-
@@ -520,6 +602,13 @@ public class HTTP1ServerASP {
 			byte[] contents = "".getBytes();
 			// file must not be a directory and has to exist
 			if (file.exists() && !file.isDirectory()) {
+				String filePath = req.resource.toString();
+				String[] extArr = filePath.split("\\.");
+				String ext = extArr[extArr.length - 1].toLowerCase();
+				if(ext.equalsIgnoreCase("cgi")){
+					doCGI(req);
+					return;
+				}
 				if (req.ifModified && !head) {
 					long lastModified = req.date.getTime();
 					long ifModified = req.ifModifiedDate.getTime();
@@ -603,6 +692,7 @@ public class HTTP1ServerASP {
 				return "text/plain";
 			case "css":
 				return "text/css";
+			case "cgi":
 			case "html":
 			case "htm":
 				return "text/html";
@@ -649,21 +739,17 @@ public class HTTP1ServerASP {
 			header.append("\r\n");
 			header.append("Content-Encoding: identity");
 			header.append("\r\n");
+			if(obj != null && obj.cookieResp != null){
+				header.append(obj.cookieResp);
+			}
 			if (obj != null && (status == 200 || status == 304 || status == 204)) {
 				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
-				if (!obj.httpMethod.equalsIgnoreCase("post")) {
-					header.append("Expires: " + getServerTime(nowYear));
-					header.append("\r\n");
-					header.append("Last-Modified: " + getServerTime(obj.date));
-					header.append("\r\n");
-					header.append("Content-Type: " + getMIME(ext));
-					header.append("\r\n");
-				} else if (status != 204 || obj.httpMethod.equalsIgnoreCase("post")) {
-					header.append("Expires: " + getServerTime(nowYear));
-					header.append("\r\n");
-					header.append("Content-Type: text/html");
-					header.append("\r\n");
-				}
+				header.append("Expires: " + getServerTime(nowYear));
+				header.append("\r\n");
+				header.append("Last-Modified: " + getServerTime(obj.date));
+				header.append("\r\n");
+				header.append("Content-Type: " + getMIME(ext));
+				header.append("\r\n");
 			} else {
 				// Content length for 404?
 				header.append("Content-Type: " + getMIME("txt"));
@@ -789,6 +875,8 @@ public class HTTP1ServerASP {
 		private boolean typeHeader = false;
 		private String fromField = null;
 		private String userAgnet = null;
+		private String cookieStr = null;
+		private String cookieResp = null;
 
 		ReqObj(String httpMethod, File resource, float httpVer, String relativePath) {
 			this.relativePath = relativePath;
