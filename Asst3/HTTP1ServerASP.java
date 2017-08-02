@@ -1,5 +1,6 @@
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.text.ParseException;
@@ -329,7 +330,6 @@ public class HTTP1ServerASP {
 		 */
 		private void parseHeader(List<String> header, ReqObj req) {
 			for (String headerStr : header) {
-				System.out.println(headerStr);
 				if (headerStr != null && headerStr.length() > 0) {
 					String[] headerParts = headerStr.split(":", 2);
 					if (headerParts.length == 2 && headerParts[0].length() > 0 && headerParts[1].length() > 0) {
@@ -389,12 +389,23 @@ public class HTTP1ServerASP {
 		 * @param length
 		 * Decode the paylaod as per RFC-3986
 		 */
+		
+		private byte[] trim(byte[] bytes)
+		{
+		    int i = bytes.length - 1;
+		    while (i >= 0 && bytes[i] == 0)
+		    {
+		        --i;
+		    }
+
+		    return Arrays.copyOf(bytes, i + 1);
+		}
+		
 		private byte[] getPayload(long length) {
 			byte[] data = new byte[(int) length + 2048];
 			int count = 0;
 			try { 
 				while(count < (int) length){
-					System.out.println(count + " / " + length);
 					int c = in.read(data, count, 2048);
 					if(c == -1){
 						break;
@@ -402,7 +413,7 @@ public class HTTP1ServerASP {
 						count += c;
 					}
 				}
-				return data;
+				return trim(data);
 			} catch (Exception e) {
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
@@ -507,7 +518,7 @@ public class HTTP1ServerASP {
 						long length = 0;
 						try {
 							if(req.boundary == null){
-							payload = java.net.URLDecoder.decode(payload.toString(), "UTF-8").getBytes();
+							payload = java.net.URLDecoder.decode(new String(payload), "UTF-8").getBytes();
 							}
 							String hostIP = Inet4Address.getLocalHost().getHostAddress();
 							ProcessBuilder pb = new ProcessBuilder(filePath);
