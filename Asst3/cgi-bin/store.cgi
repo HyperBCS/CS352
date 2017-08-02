@@ -42,8 +42,7 @@ try:
     method = os.environ.get("REQUEST_METHOD")
     content_length = int(os.environ.get("CONTENT_LENGTH", ""))
 except ValueError:
-    writeHTML("Invalid Method")
-    sys.exit()
+    pass
 
 cookie_str = None
 try:

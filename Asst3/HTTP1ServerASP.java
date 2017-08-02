@@ -112,7 +112,7 @@ public class HTTP1ServerASP {
 		private Socket clientSocket;
 		private int port;
 		private String reqStr;
-		private BufferedReader in = null;
+		private InputStream in = null;
 
 		HTTPThread(Socket c, int port) {
 			this.port = port;
@@ -298,6 +298,15 @@ public class HTTP1ServerASP {
 					&& headerData.equalsIgnoreCase("application/x-www-form-urlencoded")) {
 				req.typeHeader = true;
 			}
+			if(headerParts[0].equalsIgnoreCase("Content-Type")){
+				if(headerData.split("multipart/form-data").length > 1){
+					String[] secondPart = headerData.split("boundary=");
+					if(secondPart.length > 1){
+						String boundary = secondPart[1];
+						req.boundary = boundary;
+					}
+				}
+			}
 			if (headerParts[0].equalsIgnoreCase("From")) {
 				req.fromField = headerData;
 			}
@@ -320,6 +329,7 @@ public class HTTP1ServerASP {
 		 */
 		private void parseHeader(List<String> header, ReqObj req) {
 			for (String headerStr : header) {
+				System.out.println(headerStr);
 				if (headerStr != null && headerStr.length() > 0) {
 					String[] headerParts = headerStr.split(":", 2);
 					if (headerParts.length == 2 && headerParts[0].length() > 0 && headerParts[1].length() > 0) {
@@ -379,14 +389,20 @@ public class HTTP1ServerASP {
 		 * @param length
 		 * Decode the paylaod as per RFC-3986
 		 */
-		private String getPayload(long length) {
-			StringBuilder line = new StringBuilder();
-			try {
-				for (int i = 0; i < length; i++) {
-					char c = (char) in.read();
-					line.append(Character.toString(c));
+		private byte[] getPayload(long length) {
+			byte[] data = new byte[(int) length + 2048];
+			int count = 0;
+			try { 
+				while(count < (int) length){
+					System.out.println(count + " / " + length);
+					int c = in.read(data, count, 2048);
+					if(c == -1){
+						break;
+					} else{
+						count += c;
+					}
 				}
-				return line.toString();
+				return data;
 			} catch (Exception e) {
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
@@ -399,11 +415,9 @@ public class HTTP1ServerASP {
 		 * @param payload
 		 * This method will the send the payload to tge CGI script via standard in
 		 */
-		private boolean sendInput(Process p, String payload) {
-			try (OutputStream stdin = p.getOutputStream();
-					 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));) {
-				writer.write(payload);
-				writer.flush();
+		private boolean sendInput(Process p, byte[] payload) {
+			try (OutputStream stdin = p.getOutputStream();) {
+				stdin.write(payload);
 				return true;
 			} catch (Exception e) {
 				String error = getStackTrace(e);
@@ -472,7 +486,7 @@ public class HTTP1ServerASP {
 				String noLength = "Length Required";
 				returnResponse(411, noLength.getBytes(), noLength.length(), req);
 				return;
-			} else if (!req.typeHeader) {
+			} else if (!req.typeHeader && req.boundary == null) {
 				String noType = "Internal Server Error";
 				returnResponse(500, noType.getBytes(), noType.length(), req);
 				return;
@@ -487,17 +501,19 @@ public class HTTP1ServerASP {
 					return;
 				}
 				if (file.canExecute()) { //execute cgi file
-					String payload = getPayload(req.lengthHeaderData);
+					byte[] payload = getPayload(req.lengthHeaderData);
 					if (payload != null) {
 						byte[] stdout = null;
 						long length = 0;
 						try {
-							payload = java.net.URLDecoder.decode(payload, "UTF-8");
+							if(req.boundary == null){
+							payload = java.net.URLDecoder.decode(payload.toString(), "UTF-8").getBytes();
+							}
 							String hostIP = Inet4Address.getLocalHost().getHostAddress();
-							ProcessBuilder pb = new ProcessBuilder(filePath, payload);
+							ProcessBuilder pb = new ProcessBuilder(filePath);
 							pb.redirectErrorStream(true);
 							Map<String, String> env = pb.environment();
-							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
+							env.put("CONTENT_LENGTH", String.valueOf(payload.length));
 							env.put("SCRIPT_NAME", req.relativePath);
 							env.put("SERVER_NAME", hostIP);
 							env.put("REQUEST_METHOD", req.httpMethod);
@@ -542,17 +558,13 @@ public class HTTP1ServerASP {
 				File file = req.resource;
 				String filePath = req.resource.toString();
 				if (file.canExecute()) { //execute cgi file
-					String payload = getPayload(req.lengthHeaderData);
-					if (payload != null) {
 						byte[] stdout = null;
 						long length = 0;
 						try {
-							payload = java.net.URLDecoder.decode(payload, "UTF-8");
 							String hostIP = Inet4Address.getLocalHost().getHostAddress();
-							ProcessBuilder pb = new ProcessBuilder(filePath, payload);
+							ProcessBuilder pb = new ProcessBuilder(filePath);
 							pb.redirectErrorStream(true);
 							Map<String, String> env = pb.environment();
-							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
 							env.put("SCRIPT_NAME", req.relativePath);
 							env.put("SERVER_NAME", hostIP);
 							env.put("SERVER_PORT", String.valueOf(port));
@@ -581,9 +593,6 @@ public class HTTP1ServerASP {
 							return;
 						}
 						returnResponse(req.status, stdout, length, req);
-					} else {
-						returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(), req);
-					}
 				} else {
 					returnResponse(403, "Forbidden".getBytes(), "Forbidden".length(), req);
 				}
@@ -802,10 +811,9 @@ public class HTTP1ServerASP {
 			Socket client = null;
 			try {
 				client = clientSocket;
-				in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+				in = clientSocket.getInputStream();
 				// Reads the request from the client
 				List<String> header = new ArrayList<>();
-				reqStr = in.readLine();
 				// We got something so no more timeout
 
 				while (true) {
@@ -823,6 +831,7 @@ public class HTTP1ServerASP {
 					}
 				}
 				// Parse the request, we can do a switch case based on request
+				reqStr = header.get(0);
 				ReqObj req = parseReq(reqStr);
 				if (req != null) {
 					parseHeader(header, req);
@@ -873,6 +882,7 @@ public class HTTP1ServerASP {
 		private boolean lengthHeader = false;
 		private long lengthHeaderData = 0;
 		private boolean typeHeader = false;
+		private String boundary = null;
 		private String fromField = null;
 		private String userAgnet = null;
 		private String cookieStr = null;
