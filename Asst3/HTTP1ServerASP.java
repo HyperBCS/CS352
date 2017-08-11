@@ -228,11 +228,17 @@ public class HTTP1ServerASP {
 			// Set paths to be merged
 			if (reqArr[1].length() > 0 && reqArr[1].charAt(0) == '/') {
 				try {
+					String queryString = null;
 					String relativePath = java.net.URLDecoder.decode(reqArr[1], "UTF-8");
+					String[] queryMaybe = relativePath.split("\\?");
+					if(queryMaybe.length > 1) {
+						queryString = queryMaybe[1];
+						relativePath = queryMaybe[0];
+					}
 					String workingDir = System.getProperty("user.dir");
 					File dir = new File(workingDir);
 					File fullPath = new File(dir, relativePath);
-					return new ReqObj(method, fullPath, ver, relativePath);
+					return new ReqObj(method, fullPath, ver, relativePath,queryString);
 				} catch (Exception e) {
 					String error = getStackTrace(e);
 					LOGGER.log(Level.SEVERE, error);
@@ -580,6 +586,9 @@ public class HTTP1ServerASP {
 							env.put("SERVER_NAME", hostIP);
 							env.put("SERVER_PORT", String.valueOf(port));
 							env.put("REQUEST_METHOD", req.httpMethod);
+							if(req.queryParam != null) {
+								env.put("QUERY_STRING", req.queryParam);
+							}
 							if (req.fromField != null)
 								env.put("HTTP_FROM", req.fromField);
 							if (req.userAgnet != null)
@@ -893,13 +902,15 @@ public class HTTP1ServerASP {
 		private boolean lengthHeader = false;
 		private long lengthHeaderData = 0;
 		private boolean typeHeader = false;
+		private String queryParam = null;
 		private String boundary = null;
 		private String fromField = null;
 		private String userAgnet = null;
 		private String cookieStr = null;
 		private String cookieResp = null;
 
-		ReqObj(String httpMethod, File resource, float httpVer, String relativePath) {
+		ReqObj(String httpMethod, File resource, float httpVer, String relativePath, String queryString) {
+			this.queryParam = queryString;
 			this.relativePath = relativePath;
 			this.httpMethod = httpMethod;
 			this.resource = resource;
