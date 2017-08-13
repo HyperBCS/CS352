@@ -517,7 +517,7 @@ public class HTTP1ServerASP {
 					returnResponse(405, "Method Not Allowed".getBytes(), "Method Not Allowed".length(), req);
 					return;
 				}
-				if (file.canExecute()) { //execute cgi file
+				if (file.canExecute() && file.canRead()) { //execute cgi file
 					byte[] payload = getPayload(req.lengthHeaderData);
 					if (payload != null) {
 						byte[] stdout = null;
@@ -574,7 +574,7 @@ public class HTTP1ServerASP {
 		private void doCGI(ReqObj req) {
 				File file = req.resource;
 				String filePath = req.resource.toString();
-				if (file.canExecute()) { //execute cgi file
+				if (file.canExecute() && file.canRead()) { //execute cgi file
 						byte[] stdout = null;
 						long length = 0;
 						try {
