@@ -18,24 +18,24 @@ except ValueError:
 
 payload = sys.stdin.read(content_length)
 
-if method == "GET":
-    html = """
-    <form action=\"/cgi-bin/service.cgi\"
-    enctype=\"multipart/form-data\" method=\"post\">
-    <p>
-    Enter MD5:<br>
-    <input type=\"text\" name=\"md5input\" size="30">
-    </p>
-    <p>
-    Please specify a file, or a set of files:<br>
-    <input type=\"file\" name=\"datafile\" size=\"40\">
-    </p>
-    <div>
-    <input type=\"submit\" value=\"Send\">
-    </div>
-    </form>
-    """
+html = """
+<form action=\"/cgi-bin/service.cgi\"
+enctype=\"multipart/form-data\" method=\"post\">
+<p>
+Enter MD5:<br>
+<input type=\"text\" name=\"md5input\" size="30">
+</p>
+<p>
+Please specify a file, or a set of files:<br>
+<input type=\"file\" name=\"datafile\" size=\"40\">
+</p>
+<div>
+<input type=\"submit\" value=\"Send\">
+</div>
+</form>
+"""
 
+if method == "GET":
     writeHTML(html)
     sys.exit()
 
@@ -52,11 +52,29 @@ file = parsed.getfirst("datafile", "")
 if(len(md5sum) == 0 or len(file) == 0):
     writeHTML(html)
     sys.exit()
+filename = parsed['datafile'].filename
 md5good = hashlib.md5(file).hexdigest()
 if md5good.lower() == md5sum.lower():
-    string = "The hashes match."
+    response = "Yes"
 else:
-    string = md5sum.lower() + " DOES NOT MATCH " + md5good
+    response = "No"
+
+string = """
+    <table border=\"1\">
+  <tr>
+    <th>File</th>
+    <th>Input MD5</th>
+    <th>Generated MD5</th>
+    <th>Match</th>
+  </tr>
+  <tr>
+    <td>""" + filename + """</td>
+    <td>""" + md5sum.lower() + """</td>
+    <td>""" + md5good + """</td>
+    <td>""" + response + """</td>
+  </tr>
+</table>"""
+
 writeHTML(string)
 # writeHTML(str(parsed))
 #encode('utf-8')
