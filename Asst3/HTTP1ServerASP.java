@@ -318,7 +318,7 @@ public class HTTP1ServerASP {
 				req.fromField = headerData;
 			}
 			if (headerParts[0].equalsIgnoreCase("User-Agent")) {
-				req.userAgnet = headerData;
+				req.userAgent = headerData;
 			}
 			if (headerParts[0].equalsIgnoreCase("Cookie")) {
 				if(headerData.split("=").length > 1){
@@ -395,7 +395,7 @@ public class HTTP1ServerASP {
 		 * @param length
 		 * Decode the paylaod as per RFC-3986
 		 */
-		
+
 		private byte[] trim(byte[] bytes)
 		{
 		    int i = bytes.length - 1;
@@ -406,13 +406,19 @@ public class HTTP1ServerASP {
 
 		    return Arrays.copyOf(bytes, i + 1);
 		}
-		
+
+		/**
+		 * @param length- length of the header data
+		 * This method will get the contents of the file (payload)
+		 * and store it as bytes in a byte-array
+		 * @return data- byte array containing contents of file
+		 */
 		private byte[] getPayload(long length) {
 			byte[] data = new byte[(int) length + 2048];
 			int count = 0;
-			try { 
+			try {
 				while(count < (int) length){
-					int c = in.read(data, count, 2048);
+					int c = in.read(data, count, 2048); //read into byte-array
 					if(c == -1){
 						break;
 					} else{
@@ -442,7 +448,13 @@ public class HTTP1ServerASP {
 				return false;
 			}
 		}
-		
+
+
+		/**
+		 * @param pc
+		 * This method will parse the cookie set by the server
+		 * @return- the type of cookie set by the server
+		 */
 		String parseCookie(String pc){
 			String[] split = pc.split("Set-Cookie:");
 			if(split.length > 1){
@@ -537,8 +549,8 @@ public class HTTP1ServerASP {
 							env.put("SERVER_PORT", String.valueOf(port));
 							if (req.fromField != null)
 								env.put("HTTP_FROM", req.fromField);
-							if (req.userAgnet != null)
-								env.put("HTTP_USER_AGENT", req.userAgnet);
+							if (req.userAgent != null)
+								env.put("HTTP_USER_AGENT", req.userAgent);
 							if(req.cookieStr != null){
 								env.put("HTTP_COOKIE", req.cookieStr);
 							}
@@ -570,7 +582,14 @@ public class HTTP1ServerASP {
 				returnResponse(404, "File not found".getBytes(), "File not found".length(), req);
 			}
 		}
-		
+
+		/**
+		 * @req- The Request Object
+		 * This method will properly execute a CGI file from
+		 * a given HTTP request from a certain user agent.
+		 * Appropriate response is returned, possibly notifying
+		 * of errors, if there are any. 
+		 */
 		private void doCGI(ReqObj req) {
 				File file = req.resource;
 				String filePath = req.resource.toString();
@@ -591,8 +610,8 @@ public class HTTP1ServerASP {
 							}
 							if (req.fromField != null)
 								env.put("HTTP_FROM", req.fromField);
-							if (req.userAgnet != null)
-								env.put("HTTP_USER_AGENT", req.userAgnet);
+							if (req.userAgent != null)
+								env.put("HTTP_USER_AGENT", req.userAgent);
 							if(req.cookieStr != null){
 								env.put("HTTP_COOKIE", req.cookieStr);
 							}
@@ -905,7 +924,7 @@ public class HTTP1ServerASP {
 		private String queryParam = null;
 		private String boundary = null;
 		private String fromField = null;
-		private String userAgnet = null;
+		private String userAgent = null;
 		private String cookieStr = null;
 		private String cookieResp = null;
 

@@ -8,6 +8,8 @@ import datetime
 from urlparse import parse_qs
 import Cookie
 
+#Extract the information from the cookie
+#gotten from the user
 def getCookieData(cookie):
     try:
         params = parse_qs(cookie)
@@ -21,6 +23,7 @@ def getCookieData(cookie):
 
 ZERO = datetime.timedelta(0)
 
+#Allows the server to set the cookie date
 class UTC(datetime.tzinfo):
     def utcoffset(self, dt):
         return ZERO
@@ -31,6 +34,7 @@ class UTC(datetime.tzinfo):
     def dst(self, dt):
         return ZERO
 
+# Set dyanmic html depending on the contents of the CGI file
 def writeHTML(content,cookie=None):
     html_message = ""
     if(cookie != None):
@@ -50,6 +54,7 @@ try:
 except:
     pass
 
+# Set prices for drop-down items
 def prices(item):
     if item == "Toyota":
         return 100
@@ -61,6 +66,7 @@ def prices(item):
         return 400
     return 0
 
+# Extract what the user selected in the drop-down list
 def getDropDown(name, cart=None):
     items = set(["Toyota", "Ford", "Tesla", "Subaru"])
     if cart != None:
@@ -81,10 +87,10 @@ def getDropDown(name, cart=None):
         <table border=\"1\">
       <tr>
         <th>Item</th>
-        <th>Price</th> 
+        <th>Price</th>
         <th>Remove</th>
       </tr>
-      
+
       """
         total = 0
         for i in cart:
@@ -103,6 +109,7 @@ def getDropDown(name, cart=None):
         html += "<p> Cart Empty</p>"
     return html
 
+# POST the login info to allow user to login to site
 def getLogin():
     html = """
     <form action="/cgi-bin/store.cgi" method="post">
@@ -113,12 +120,13 @@ def getLogin():
   <input type="text" name="password">
   <br><br>
   <input type="submit" name="action" value="Submit">
-    </form> 
+    </form>
     """
     return html
 
 session = getCookieData(cookie_str)
 
+#POST user action and set the cookie with date
 if method == "POST":
     cookie = None
     if content_length > 0:
@@ -181,12 +189,9 @@ if method == "GET" and session is not None:
     sys.exit()
 
 
-
+#User never performed request so no
+#cookie was ever sent to the server
 if session is None:
     html = getLogin()
     writeHTML(html)
     sys.exit()
-
-
-
-

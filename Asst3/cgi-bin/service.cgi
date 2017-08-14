@@ -6,6 +6,7 @@ import cgi
 import hashlib
 from io import BytesIO as IO
 
+#print to sysout the html content retrieved
 def writeHTML(content):
     sys.stdout.write("<html>\n<body>" + content + "</body>\n</html>")
 
@@ -75,6 +76,8 @@ string = """
   </tr>
 </table>"""
 
+#Uses dynamically-generated HTML to validate
+#people's downloads by computing MD5 hashes
 writeHTML(string)
 # writeHTML(str(parsed))
 #encode('utf-8')
