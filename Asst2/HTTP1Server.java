@@ -1,5 +1,6 @@
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.text.ParseException;
@@ -21,17 +22,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class HTTP1Server {
+public class HTTP1ServerASP {
 
 	private ServerSocket serverSocket; // the main socket for the server
 	private int port; // which port it exists on gotten from command line
-	private static final Logger LOGGER = Logger.getLogger(HTTP1Server.class.getName());
+	private static final Logger LOGGER = Logger.getLogger(HTTP1ServerASP.class.getName());
 
 	/**
 	 * Constructor to start the server and creates a new thread for each
 	 * connection
 	 */
-	HTTP1Server(String[] args) {
+	HTTP1ServerASP(String[] args) {
 
 		// Initialize a serverSocket to accept clients
 		try {
@@ -95,12 +96,12 @@ public class HTTP1Server {
 		// Check that our arguments are correct. If not we print message and
 		// exit.
 		if (args.length != 1) {
-			LOGGER.log(Level.INFO, "Usage: java -cp . HTTP1Server 3456");
+			LOGGER.log(Level.INFO, "Usage: java -cp . HTTP1ServerASP 3456");
 			return;
 		}
 		System.setProperty("java.util.logging.SimpleFormatter.format",
 				"[%1$tm/%1$td/%1$tY %1$tH:%1$tM:%1$tS] %5$s%6$s%n");
-		HTTP1Server server = new HTTP1Server(args);
+		HTTP1ServerASP server = new HTTP1ServerASP(args);
 		server.start();
 		return;
 	}
@@ -112,7 +113,7 @@ public class HTTP1Server {
 		private Socket clientSocket;
 		private int port;
 		private String reqStr;
-		private BufferedReader in = null;
+		private InputStream in = null;
 
 		HTTPThread(Socket c, int port) {
 			this.port = port;
@@ -227,11 +228,17 @@ public class HTTP1Server {
 			// Set paths to be merged
 			if (reqArr[1].length() > 0 && reqArr[1].charAt(0) == '/') {
 				try {
+					String queryString = null;
 					String relativePath = java.net.URLDecoder.decode(reqArr[1], "UTF-8");
+					String[] queryMaybe = relativePath.split("\\?");
+					if(queryMaybe.length > 1) {
+						queryString = queryMaybe[1];
+						relativePath = queryMaybe[0];
+					}
 					String workingDir = System.getProperty("user.dir");
 					File dir = new File(workingDir);
 					File fullPath = new File(dir, relativePath);
-					return new ReqObj(method, fullPath, ver, relativePath);
+					return new ReqObj(method, fullPath, ver, relativePath,queryString);
 				} catch (Exception e) {
 					String error = getStackTrace(e);
 					LOGGER.log(Level.SEVERE, error);
@@ -298,11 +305,25 @@ public class HTTP1Server {
 					&& headerData.equalsIgnoreCase("application/x-www-form-urlencoded")) {
 				req.typeHeader = true;
 			}
+			if(headerParts[0].equalsIgnoreCase("Content-Type")){
+				if(headerData.split("multipart/form-data").length > 1){
+					String[] secondPart = headerData.split("boundary=");
+					if(secondPart.length > 1){
+						String boundary = secondPart[1];
+						req.boundary = boundary;
+					}
+				}
+			}
 			if (headerParts[0].equalsIgnoreCase("From")) {
 				req.fromField = headerData;
 			}
 			if (headerParts[0].equalsIgnoreCase("User-Agent")) {
-				req.userAgnet = headerData;
+				req.userAgent = headerData;
+			}
+			if (headerParts[0].equalsIgnoreCase("Cookie")) {
+				if(headerData.split("=").length > 1){
+					req.cookieStr = headerData;
+				}
 			}
 		}
 
@@ -337,7 +358,7 @@ public class HTTP1Server {
 			String badReq = "Bad Request";
 			String wrongVer = "HTTP Version Not Supported";
 			// NEED TO CHANGE THIS BACK to 1.0
-			if (ver > 0 && ver <= 1.0) {
+			if (ver > 0 && (1.1 - ver) > -0.0001) {
 				getFileInfo(request);
 				switch (method) {
 				case "GET":
@@ -374,14 +395,41 @@ public class HTTP1Server {
 		 * @param length
 		 * Decode the paylaod as per RFC-3986
 		 */
-		private String getPayload(long length) {
-			StringBuilder line = new StringBuilder();
+
+		private byte[] trim(byte[] bytes)
+		{
+		    int i = bytes.length - 1;
+		    while (i >= 0 && bytes[i] == 0)
+		    {
+		        --i;
+		    }
+
+		    return Arrays.copyOf(bytes, i + 1);
+		}
+
+		/**
+		 * @param length- length of the header data
+		 * This method will get the contents of the file (payload)
+		 * and store it as bytes in a byte-array
+		 * @return data- byte array containing contents of file
+		 */
+		private byte[] getPayload(long length) {
+			byte[] data = new byte[(int) length];
+			int count = 0;
 			try {
-				for (int i = 0; i < length; i++) {
-					char c = (char) in.read();
-					line.append(Character.toString(c));
+				while(count < (int) length){
+					int l = 2048;
+					if(length - count < l) {
+						l = (int)length - count;
+					}
+					int c = in.read(data, count, l); //read into byte-array
+					if(c == -1){
+						break;
+					} else{
+						count += c;
+					}
 				}
-				return line.toString();
+				return data;
 			} catch (Exception e) {
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
@@ -394,11 +442,9 @@ public class HTTP1Server {
 		 * @param payload
 		 * This method will the send the payload to tge CGI script via standard in
 		 */
-		private boolean sendInput(Process p, String payload) {
-			try (OutputStream stdin = p.getOutputStream();
-					 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));) {
-				writer.write(payload);
-				writer.flush();
+		private boolean sendInput(Process p, byte[] payload) {
+			try (OutputStream stdin = p.getOutputStream();) {
+				stdin.write(payload);
 				return true;
 			} catch (Exception e) {
 				String error = getStackTrace(e);
@@ -407,23 +453,51 @@ public class HTTP1Server {
 			}
 		}
 
+
+		/**
+		 * @param pc
+		 * This method will parse the cookie set by the server
+		 * @return- the type of cookie set by the server
+		 */
+		String parseCookie(String pc){
+			String[] split = pc.split("Set-Cookie:");
+			if(split.length > 1){
+				return pc;
+			} else{
+				return null;
+			}
+		}
+
 		/**
 		 * @param Process p
 		 * Recieve the output of the execution of a CGI file
 		 */
-		private String getOutput(Process p) {
+		private String getOutput(Process p, ReqObj req) {
 			try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));) {
 				StringBuilder builder = new StringBuilder();
+				StringBuilder cookieResp = new StringBuilder();
 				String line = null;
 				// may need to account for when nothing is printed back
 				while ((line = reader.readLine()) != null) {
 					if (builder.length() == 0) {
-						builder.append(line);
+						if(parseCookie(line) != null){
+							cookieResp.append(line + "\r\n");
+						} else{
+							builder.append(line);
+						}
 					} else {
-						builder.append(System.getProperty("line.separator")); //OS-dependent line separator
-						builder.append(line);
+						if(parseCookie(line) != null){
+							cookieResp.append(line + "\r\n");
+						} else{
+							builder.append(System.getProperty("line.separator")); //OS-dependent line separator
+							builder.append(line);
+						}
+
 					}
 
+				}
+				if(cookieResp.length() > 0){
+					req.cookieResp = cookieResp.toString();
 				}
 				return builder.toString();
 			} catch (Exception e) {
@@ -445,7 +519,7 @@ public class HTTP1Server {
 				String noLength = "Length Required";
 				returnResponse(411, noLength.getBytes(), noLength.length(), req);
 				return;
-			} else if (!req.typeHeader) {
+			} else if (!req.typeHeader && req.boundary == null) {
 				String noType = "Internal Server Error";
 				returnResponse(500, noType.getBytes(), noType.length(), req);
 				return;
@@ -459,28 +533,34 @@ public class HTTP1Server {
 					returnResponse(405, "Method Not Allowed".getBytes(), "Method Not Allowed".length(), req);
 					return;
 				}
-				if (file.canExecute()) { //execute cgi file
-					String payload = getPayload(req.lengthHeaderData);
+				if (file.canExecute() && file.canRead()) { //execute cgi file
+					byte[] payload = getPayload(req.lengthHeaderData);
 					if (payload != null) {
 						byte[] stdout = null;
 						long length = 0;
 						try {
-							payload = java.net.URLDecoder.decode(payload, "UTF-8");
+							if(req.boundary == null){
+							payload = java.net.URLDecoder.decode(new String(payload), "UTF-8").getBytes();
+							}
 							String hostIP = Inet4Address.getLocalHost().getHostAddress();
-							ProcessBuilder pb = new ProcessBuilder(filePath, payload);
+							ProcessBuilder pb = new ProcessBuilder(filePath);
 							pb.redirectErrorStream(true);
 							Map<String, String> env = pb.environment();
-							env.put("CONTENT_LENGTH", String.valueOf(payload.length()));
+							env.put("CONTENT_LENGTH", String.valueOf(payload.length));
 							env.put("SCRIPT_NAME", req.relativePath);
 							env.put("SERVER_NAME", hostIP);
+							env.put("REQUEST_METHOD", req.httpMethod);
 							env.put("SERVER_PORT", String.valueOf(port));
 							if (req.fromField != null)
 								env.put("HTTP_FROM", req.fromField);
-							if (req.userAgnet != null)
-								env.put("HTTP_USER_AGENT", req.userAgnet);
+							if (req.userAgent != null)
+								env.put("HTTP_USER_AGENT", req.userAgent);
+							if(req.cookieStr != null){
+								env.put("HTTP_COOKIE", req.cookieStr);
+							}
 							Process p = pb.start();
 							sendInput(p, payload);
-							String output = getOutput(p);
+							String output = getOutput(p, req);
 							if (output != null && output.length() == 0) {
 								req.status = 204;
 							} else if (output != null) {
@@ -508,6 +588,60 @@ public class HTTP1Server {
 		}
 
 		/**
+		 * @req- The Request Object
+		 * This method will properly execute a CGI file from
+		 * a given HTTP request from a certain user agent.
+		 * Appropriate response is returned, possibly notifying
+		 * of errors, if there are any. 
+		 */
+		private void doCGI(ReqObj req) {
+				File file = req.resource;
+				String filePath = req.resource.toString();
+				if (file.canExecute() && file.canRead()) { //execute cgi file
+						byte[] stdout = null;
+						long length = 0;
+						try {
+							String hostIP = Inet4Address.getLocalHost().getHostAddress();
+							ProcessBuilder pb = new ProcessBuilder(filePath);
+							pb.redirectErrorStream(true);
+							Map<String, String> env = pb.environment();
+							env.put("SCRIPT_NAME", req.relativePath);
+							env.put("SERVER_NAME", hostIP);
+							env.put("SERVER_PORT", String.valueOf(port));
+							env.put("REQUEST_METHOD", req.httpMethod);
+							if(req.queryParam != null) {
+								env.put("QUERY_STRING", req.queryParam);
+							}
+							if (req.fromField != null)
+								env.put("HTTP_FROM", req.fromField);
+							if (req.userAgent != null)
+								env.put("HTTP_USER_AGENT", req.userAgent);
+							if(req.cookieStr != null){
+								env.put("HTTP_COOKIE", req.cookieStr);
+							}
+							Process p = pb.start();
+							String output = getOutput(p, req);
+							if (output != null && output.length() == 0) {
+								req.status = 204;
+							} else if (output != null) {
+								req.status = 200;
+								stdout = output.getBytes();
+								length = output.length();
+							}
+						} catch (Exception e) {
+							String error = getStackTrace(e);
+							LOGGER.log(Level.SEVERE, error);
+							returnResponse(500, "Internal Server Error".getBytes(), "Internal Server Error".length(),
+									req);
+							return;
+						}
+						returnResponse(req.status, stdout, length, req);
+				} else {
+					returnResponse(403, "Forbidden".getBytes(), "Forbidden".length(), req);
+				}
+		}
+
+		/**
 		 * @param req-
 		 *            the GET request This method will perform get a resource
 		 *            defined in the ReqObj. Then it will call return response
@@ -520,6 +654,13 @@ public class HTTP1Server {
 			byte[] contents = "".getBytes();
 			// file must not be a directory and has to exist
 			if (file.exists() && !file.isDirectory()) {
+				String filePath = req.resource.toString();
+				String[] extArr = filePath.split("\\.");
+				String ext = extArr[extArr.length - 1].toLowerCase();
+				if(ext.equalsIgnoreCase("cgi")){
+					doCGI(req);
+					return;
+				}
 				if (req.ifModified && !head) {
 					long lastModified = req.date.getTime();
 					long ifModified = req.ifModifiedDate.getTime();
@@ -603,6 +744,7 @@ public class HTTP1Server {
 				return "text/plain";
 			case "css":
 				return "text/css";
+			case "cgi":
 			case "html":
 			case "htm":
 				return "text/html";
@@ -649,21 +791,17 @@ public class HTTP1Server {
 			header.append("\r\n");
 			header.append("Content-Encoding: identity");
 			header.append("\r\n");
+			if(obj != null && obj.cookieResp != null){
+				header.append(obj.cookieResp);
+			}
 			if (obj != null && (status == 200 || status == 304 || status == 204)) {
 				Date nowYear = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
-				if (!obj.httpMethod.equalsIgnoreCase("post")) {
-					header.append("Expires: " + getServerTime(nowYear));
-					header.append("\r\n");
-					header.append("Last-Modified: " + getServerTime(obj.date));
-					header.append("\r\n");
-					header.append("Content-Type: " + getMIME(ext));
-					header.append("\r\n");
-				} else if (status != 204 || obj.httpMethod.equalsIgnoreCase("post")) {
-					header.append("Expires: " + getServerTime(nowYear));
-					header.append("\r\n");
-					header.append("Content-Type: text/html");
-					header.append("\r\n");
-				}
+				header.append("Expires: " + getServerTime(nowYear));
+				header.append("\r\n");
+				header.append("Last-Modified: " + getServerTime(obj.date));
+				header.append("\r\n");
+				header.append("Content-Type: " + getMIME(ext));
+				header.append("\r\n");
 			} else {
 				// Content length for 404?
 				header.append("Content-Type: " + getMIME("txt"));
@@ -716,10 +854,9 @@ public class HTTP1Server {
 			Socket client = null;
 			try {
 				client = clientSocket;
-				in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+				in = clientSocket.getInputStream();
 				// Reads the request from the client
 				List<String> header = new ArrayList<>();
-				reqStr = in.readLine();
 				// We got something so no more timeout
 
 				while (true) {
@@ -737,6 +874,7 @@ public class HTTP1Server {
 					}
 				}
 				// Parse the request, we can do a switch case based on request
+				reqStr = header.get(0);
 				ReqObj req = parseReq(reqStr);
 				if (req != null) {
 					parseHeader(header, req);
@@ -787,10 +925,15 @@ public class HTTP1Server {
 		private boolean lengthHeader = false;
 		private long lengthHeaderData = 0;
 		private boolean typeHeader = false;
+		private String queryParam = null;
+		private String boundary = null;
 		private String fromField = null;
-		private String userAgnet = null;
+		private String userAgent = null;
+		private String cookieStr = null;
+		private String cookieResp = null;
 
-		ReqObj(String httpMethod, File resource, float httpVer, String relativePath) {
+		ReqObj(String httpMethod, File resource, float httpVer, String relativePath, String queryString) {
+			this.queryParam = queryString;
 			this.relativePath = relativePath;
 			this.httpMethod = httpMethod;
 			this.resource = resource;

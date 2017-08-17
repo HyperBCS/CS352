@@ -414,18 +414,22 @@ public class HTTP1ServerASP {
 		 * @return data- byte array containing contents of file
 		 */
 		private byte[] getPayload(long length) {
-			byte[] data = new byte[(int) length + 2048];
+			byte[] data = new byte[(int) length];
 			int count = 0;
 			try {
 				while(count < (int) length){
-					int c = in.read(data, count, 2048); //read into byte-array
+					int l = 2048;
+					if(length - count < l) {
+						l = (int)length - count;
+					}
+					int c = in.read(data, count, l); //read into byte-array
 					if(c == -1){
 						break;
 					} else{
 						count += c;
 					}
 				}
-				return trim(data);
+				return data;
 			} catch (Exception e) {
 				String error = getStackTrace(e);
 				LOGGER.log(Level.SEVERE, error);
